@@ -84,6 +84,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 
-from app.api.endpoints import auth
+from app.api.endpoints import auth, admin
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
+app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
