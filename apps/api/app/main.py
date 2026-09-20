@@ -64,6 +64,21 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
 
+    def _safe_errors(errors):
+        safe = []
+        for err in errors:
+            safe_err = {}
+            for k, v in err.items():
+                if k == "ctx" and isinstance(v, dict):
+                    # ctx may contain non-serializable objects (e.g. ValueError in Python 3.14)
+                    safe_err[k] = {ck: str(cv) for ck, cv in v.items()}
+                elif isinstance(v, Exception):
+                    safe_err[k] = str(v)
+                else:
+                    safe_err[k] = v
+            safe.append(safe_err)
+        return safe
+
     return JSONResponse(
 
         status_code=422,
@@ -74,7 +89,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
             "message": "Request validation failed",
 
-            "details": exc.errors(),
+            "details": _safe_errors(exc.errors()),
 
             "request_id": getattr(request.state, "request_id", "")
 
@@ -84,7 +99,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 
-from app.api.endpoints import auth, admin
+from app.api.endpoints import auth, admin, academic
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
+app.include_router(academic.router, prefix=f"{settings.API_V1_STR}", tags=["academic"])
