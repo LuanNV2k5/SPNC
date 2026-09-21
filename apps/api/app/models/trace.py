@@ -60,3 +60,25 @@ class CodeSnapshot(Base, TimestampMixin):
     line_count: Mapped[int] = mapped_column(Integer)
 
     session: Mapped["CodingSession"] = relationship("CodingSession")
+
+class ScratchpadRevision(Base):
+    __tablename__ = "scratchpad_revisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("coding_sessions.id", ondelete="CASCADE"), index=True)
+    revision_sequence: Mapped[int] = mapped_column(Integer)
+    
+    # Optional idempotency hash, used to reject exact duplicates seamlessly
+    canonical_fingerprint: Mapped[str] = mapped_column(String(255), index=True)
+    
+    content: Mapped[str] = mapped_column(String)
+    
+    client_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    server_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    
+    session: Mapped["CodingSession"] = relationship("CodingSession")
+    
+    __table_args__ = (
+        UniqueConstraint('session_id', 'revision_sequence', name='uq_scratchpad_session_revision'),
+        CheckConstraint('revision_sequence >= 1', name='ck_scratchpad_sequence_positive'),
+    )
