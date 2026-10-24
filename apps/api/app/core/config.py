@@ -74,7 +74,18 @@ class Settings(BaseSettings):
     JUDGE_OUTPUT_LIMIT_BYTES: int = 1048576  # 1MB
     JUDGE_TEMP_DIR: str = "/tmp/spnc_judge"
 
+    # Judge Signals
+    SIGNAL_RULE_VERSION: str = "1.0.0"
+    SIGNAL_IDLE_THRESHOLD_SECONDS: int = 300
+    SIGNAL_FAST_FIRST_CODE_THRESHOLD_SECONDS: int = 30
+    SIGNAL_REPEATED_FAILURE_MIN_ATTEMPTS: int = 3
+    SIGNAL_REPEATED_FAILURE_MAX_CODE_CHANGE_RATIO: float = 0.1
+    SIGNAL_LOC_MIN_COHORT_SIZE: int = 3
+    SIGNAL_LOC_DEVIATION_MULTIPLIER: float = 2.0
 
+    # Signal Scheduler
+    SIGNAL_SCHEDULER_INTERVAL_SECONDS: int = 60
+    SIGNAL_SCHEDULER_BATCH_SIZE: int = 100
 
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 

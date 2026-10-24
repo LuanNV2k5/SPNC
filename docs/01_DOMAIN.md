@@ -273,8 +273,8 @@ Dấu vết số là **tập hợp các sự kiện có thứ tự thời gian**
 | SignalType | Evidence Schema | Configurable Threshold |
 |------------|----------------|------------------------|
 | `IDLE_DETECTED` | `{start_time, end_time, duration_seconds, meaningful_event_before_id, threshold_used}` | idle_threshold_minutes |
-| `LOC_ANOMALY` | `{session_id, final_loc, context_median_loc, delta, threshold_relative}` | relative (no absolute) |
-| `REPEATED_FAILURE` | `{problem_id, submission_count, failed_count, verdicts[], time_range_start, time_range_end}` | min failed_count configurable |
+| `LOC_ANOMALY` | `{session_id, observed_loc, context_median_loc, delta, threshold_relative, final_loc}` | relative (no absolute); observed_loc=evaluated snapshot non-blank lines; final_loc=null until session completion; zero-median yields no signal |
+| `REPEATED_FAILURE` | `{problem_id, target_entity, run_count, failed_count, verdicts[], time_range_start, time_range_end}` | min failed_count configurable; target_entity="RUN"; monitors trial runs (fix entity collision with §1.6:129) |
 | `FAST_FIRST_CODE` | `{problem_open_time, first_code_event_time, delta_seconds, threshold_seconds}` | threshold_seconds configurable |
 
 **Quy tắc domain:**
@@ -418,3 +418,5 @@ Bổ sung theo yêu cầu phân tích (B5, E section):
 | 0.1 | 2026-09-19 | Khởi tạo |
 | 0.2 | 2026-09-19 | Fixes: SessionStatus, TerminationActor, EDITOR_CHANGE operation_type enum, ExamParticipationStatus, ClassProblemPublication, AttentionSignal (remove teacher_note), TeacherAnnotation CRUD, DTI section, DI updates |
 | 0.3 | 2026-09-19 | Final baseline: LanguageIdentifier CPP17\|PYTHON3 (OQ-22); SignalType closed enum IDLE_DETECTED\|LOC_ANOMALY\|REPEATED_FAILURE\|FAST_FIRST_CODE (Mi-NEW-02); ABANDONED policy≠idle (Mi-NEW-01); sequence_number 1-based (Mi-NEW-04); Practice+Exam concurrency V1 policy (Mi-NEW-05); SessionContext field |
+| 0.4 | 2026-10-23 | DCR SPNC_RF_RUN_EVIDENCE_CONTRACT: Align REPEATED_FAILURE evidence schema to evaluate sandbox Run records ({problem_id, target_entity, run_count, failed_count, verdicts[], time_range_start, time_range_end}), resolving conflict with §1.6:129 Submission invariants. |
+| 0.5 | 2026-10-24 | DCR SPNC_LOC_EVIDENCE_CONTRACT: Align LOC_ANOMALY evidence schema ({session_id, observed_loc, context_median_loc, delta, threshold_relative, final_loc}), distinguishing intermediate observed_loc from terminal final_loc for active sessions; zero-median cohort generates no signal. |

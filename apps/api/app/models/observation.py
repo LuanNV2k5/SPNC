@@ -35,6 +35,7 @@ class AttentionSignal(Base):
     rule_version: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     evidence: Mapped[dict] = mapped_column(JSONB) # MUST NOT contain opaque ML classification or judgment
+    dedup_key: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
     session: Mapped["CodingSession"] = relationship("CodingSession")
     student: Mapped["User"] = relationship("User")
