@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, Path, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.api.deps import get_current_user, require_student, require_teacher
 from app.models.user import User, RoleEnum
@@ -50,7 +51,8 @@ def get_my_trace_state(
     highest, next_exp = svc.get_trace_state(db, current_user, session_id)
     return TraceStateResponse(
         highest_contiguous_sequence=highest,
-        next_expected_sequence=next_exp
+        next_expected_sequence=next_exp,
+        checkpoint_interval_seconds=settings.TRACE_CHECKPOINT_INTERVAL_SECONDS,
     )
 
 @router.post(

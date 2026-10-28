@@ -1,7 +1,7 @@
 # 39 — BACKEND COMPLETION: SHOULD GAPS & STORAGE HYGIENE (PHASE 13) SPECIFICATION
 
 > **Module:** Snapshot key fix, orphan-blob cleanup, admin idle threshold, checkpoint linkage, student practice list (Phase 13)
-> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — 13A/13B/13C IMPLEMENTED AND VERIFIED 2026-10-29 (§8); lock tag pending Project Owner review
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase12` @ `9a4bad6` (Phases 10–12 implemented, locks pending)
 > **Proposed Branch:** `phase13`
@@ -104,4 +104,30 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md`, with DCRs for D1 (snap
 
 ## 8. Verification Record
 
-*To be completed at Phase 13 closure.*
+### 8.1 Changes (2026-10-29)
+| Sub-phase | Commit | Files |
+|---|---|---|
+| Approval | `eff23c1` | PROJECT_PROVENANCE_LOG (spec approval; DCRs SPNC_SNAPSHOT_CONTENT_KEY, SPNC_CHECKPOINT_LINKAGE) |
+| 13A | `2aef0cd` | migration `f9b5d3e6a012`; `models/trace.py` (`object_key` index, not unique); `services/storage.py` (key `snapshots/{session}/{sha256}.txt`, `list_code_snapshots`, `delete_code_snapshot`); `services/snapshot_cleanup.py`; `reconciler.py` (`maybe_sweep_orphans`); config `SNAPSHOT_ORPHAN_*` |
+| 13B | `048a824` | migration `a1c7e4f8b213`; `coding_sessions.idle_threshold_seconds`; `services/system_settings.py`; admin settings endpoint/schemas; session creation captures the threshold; `judge/signals.py` (`_idle_threshold(session)`) |
+| 13C | this commit | `services/trace.py` (`_validate_checkpoints`), trace-state `checkpoint_interval_seconds` (config `TRACE_CHECKPOINT_INTERVAL_SECONDS`), `GET /my/practice/problems` (repo/service/endpoint) |
+
+### 8.2 Behaviour Notes
+- **Snapshots:** identical code in one session now yields separate snapshot rows that share one blob. Old `…/0_{hash8}.txt` keys still read. The migration's downgrade re-adds the UNIQUE constraint and therefore fails once rows share a key; that is expected.
+- **Orphan sweep:** reconciler loop, at most once per `SNAPSHOT_ORPHAN_SWEEP_INTERVAL_SECONDS` (3600). It lists up to `SNAPSHOT_ORPHAN_BATCH_SIZE` (500) blobs older than `SNAPSHOT_ORPHAN_GRACE_HOURS` (24) and deletes the ones no `code_snapshots.object_key` references. A listing or delete failure is logged and counted, never raised. The memory backend tracks blob creation time for this; blobs written straight into the dict by tests count as new.
+- **Idle threshold:** `/admin/settings` returns `{retention_days, idle_threshold_minutes}`; PATCH takes either or both; an empty body → 422. Idle changes write `CONFIG_CHANGED` with `{key, old, new}`; retention keeps the Phase 04 `SYSTEM_SETTING_CHANGED` action. Practice and exam sessions store the value in force at creation; IDLE evidence `threshold_used` is the session's value.
+- **Checkpoints:** every `SESSION_CHECKPOINT` in a batch is validated before insertion; a missing, malformed, foreign-session or non-CHECKPOINT `code_snapshot_id` → 422 `CHECKPOINT_SNAPSHOT_INVALID` and nothing from the batch is stored. `GET …/trace-state` (student) adds `checkpoint_interval_seconds`.
+- **Practice list:** `GET /my/practice/problems?difficulty=&language=` (STUDENT) returns PUBLIC problems plus CLASS problems published to a class with an active membership; never PRIVATE or deleted; one row per problem; newest first.
+
+### 8.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| Migrations `f9b5d3e6a012`, `a1c7e4f8b213` | Empty DB, PostgreSQL 16.15 | up / down / up OK; at head `ix_code_snapshots_object_key` (no UNIQUE) and `ck_coding_sessions_idle_threshold_range` |
+| 13A `test_phase13a_snapshots.py` + `tests/infra/test_storage_s3.py` | Disposable PostgreSQL 16.15 + disposable MinIO | **5 + 7 passed** (F1 regression, old keys readable, sweep keeps referenced/recent blobs, sweep survives storage errors, hourly throttle; MinIO list/delete) |
+| 13B `test_phase13b_idle_threshold.py` | Disposable PostgreSQL 16.15 | **3 passed** |
+| 13C `test_phase13c_checkpoint_practice.py` | same | **3 passed** |
+| Full regression Phase 03–13 | Fresh per-phase DBs migrated to head; Redis; Docker sandbox; MinIO | **511 passed, 0 failed** |
+| Demo compose stack rebuilt from `phase13` on its existing volumes | Docker Desktop (Windows host) | `migrate` applied both migrations; E2E **4 passed**. Live checks against MinIO: two identical snapshots → 200/200 and the worker ran the second (stdout `11`); valid checkpoint 200, RUN-snapshot checkpoint 422 `CHECKPOINT_SNAPSHOT_INVALID`; trace-state interval 60; practice list contains the new PUBLIC problem; admin settings show `idle_threshold_minutes` |
+
+### 8.4 Known Limitations
+- REQ-STU-004 (points) stays blocked by OQ-16. No frontend yet. OQ-26 (production judge isolation) and OQ-27 (`duration_minutes` meaning) remain open.

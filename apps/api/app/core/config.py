@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     SNAPSHOT_ORPHAN_SWEEP_INTERVAL_SECONDS: int = 3600
     SNAPSHOT_ORPHAN_BATCH_SIZE: int = 500
 
+    # REQ-TRACE-013, docs/39 D4: cadence clients should follow for CHECKPOINT snapshots
+    TRACE_CHECKPOINT_INTERVAL_SECONDS: int = 60
+
     # Teacher notification WebSocket (docs/35 09C)
     WS_AUTH_TIMEOUT_SECONDS: float = 5.0
 

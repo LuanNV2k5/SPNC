@@ -162,6 +162,26 @@ def get_public_problems(db: Session, skip: int = 0, limit: int = 50) -> Tuple[Li
     return items, total
 
 
+def get_practice_problems_for_student(
+    db: Session, student_id: uuid.UUID, skip: int = 0, limit: int = 50,
+    difficulty: Optional[str] = None, language: Optional[str] = None,
+) -> Tuple[List[Problem], int]:
+    """REQ-STU-001: PUBLIC problems plus CLASS problems published to the student's active classes."""
+    class_ids = get_class_ids_for_student(db, student_id)
+    published = db.query(ProblemClassPublication.problem_id).filter(ProblemClassPublication.class_id.in_(class_ids))
+    visible = Problem.visibility == ProblemVisibility.PUBLIC.value
+    if class_ids:
+        visible = visible | ((Problem.visibility == ProblemVisibility.CLASS.value) & Problem.id.in_(published))
+    q = db.query(Problem).filter(Problem.deleted_at.is_(None), visible)
+    if difficulty:
+        q = q.filter(Problem.difficulty == difficulty)
+    if language:
+        q = q.filter(Problem.supported_languages.contains([language]))
+    total = q.count()
+    items = q.order_by(Problem.created_at.desc(), Problem.id).offset(skip).limit(limit).all()
+    return items, total
+
+
 def update_problem(db: Session, problem: Problem, **fields) -> Problem:
     for k, v in fields.items():
         if v is not None:

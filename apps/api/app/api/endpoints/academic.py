@@ -627,6 +627,26 @@ def start_practice_session(
 
 
 @router.get(
+    "/my/practice/problems",
+    response_model=ProblemListResponse,
+    tags=["sessions"],
+    summary="[P13-S01] Practice problems I can access: PUBLIC + my classes' CLASS problems (Student)",
+)
+def list_practice_problems(
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=100),
+    difficulty: Optional[Literal["EASY", "MEDIUM", "HARD"]] = Query(None),
+    language: Optional[Literal["CPP17", "PYTHON3"]] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    page, size, skip = _paginate(page, size)
+    items, total = svc.list_practice_problems(db, student=current_user, skip=skip, limit=size,
+                                              difficulty=difficulty, language=language)
+    return {"items": items, "total": total, "page": page, "size": size}
+
+
+@router.get(
     "/my/practice/sessions",
     response_model=SessionListResponse,
     tags=["practice"],

@@ -21,6 +21,24 @@ def _error(code: str, msg: str) -> dict:
 RESERVED_EVENT_TYPES = {TraceEventType.SESSION_ENDED.value, TraceEventType.SUBMISSION_CREATED.value}
 
 
+def _validate_checkpoints(db: Session, session_id: uuid.UUID, req: TraceBatchRequest) -> None:
+    """REQ-TRACE-013, docs/39 D5: a SESSION_CHECKPOINT must reference a CHECKPOINT snapshot of this session."""
+    from app.models.trace import CodeSnapshot, SnapshotReason
+    for e in req.events:
+        if e.event_type != TraceEventType.SESSION_CHECKPOINT:
+            continue
+        snapshot = None
+        try:
+            snapshot = db.get(CodeSnapshot, uuid.UUID(str((e.payload or {}).get("code_snapshot_id"))))
+        except (ValueError, TypeError):
+            pass
+        if (snapshot is None or snapshot.session_id != session_id
+                or getattr(snapshot.reason, "value", snapshot.reason) != SnapshotReason.CHECKPOINT.value):
+            raise HTTPException(status_code=422, detail=_error(
+                "CHECKPOINT_SNAPSHOT_INVALID",
+                f"SESSION_CHECKPOINT #{e.sequence_number} must reference a CHECKPOINT snapshot of this session"))
+
+
 def _get_student_session(db: Session, student: User, session_id: uuid.UUID) -> CodingSession:
     session = academic_repo.get_session_by_id(db, session_id)
     if not session:
@@ -44,6 +62,8 @@ def ingest_trace_batch(db: Session, student: User, session_id: uuid.UUID, req: T
     if reserved:
         raise HTTPException(status_code=422, detail=_error(
             "TRACE_EVENT_TYPE_RESERVED", f"{', '.join(reserved)} is recorded by the server, not by clients"))
+
+    _validate_checkpoints(db, session_id, req)
 
     # Serialize against finalization so no client event lands after SESSION_ENDED (docs/34 S5)
     session = repo.lock_session_for_ingest(db, session_id)

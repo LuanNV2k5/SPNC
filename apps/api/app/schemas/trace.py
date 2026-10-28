@@ -17,6 +17,8 @@ class TraceBatchRequest(BaseModel):
 class TraceStateResponse(BaseModel):
     highest_contiguous_sequence: int
     next_expected_sequence: int
+    # REQ-TRACE-013 (docs/39 D4): client-driven CHECKPOINT cadence
+    checkpoint_interval_seconds: int = 60
 
 class TraceBatchResponse(BaseModel):
     accepted_count: int

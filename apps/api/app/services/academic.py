@@ -212,6 +212,11 @@ def list_problems(db: Session, owner: User, skip: int, limit: int,
     return repo.get_problems_by_owner(db, owner.id, skip=skip, limit=limit,
                                       difficulty=difficulty, language=language, visibility=visibility)
 
+def list_practice_problems(db: Session, student: User, skip: int, limit: int,
+                           difficulty: Optional[str] = None, language: Optional[str] = None):
+    return repo.get_practice_problems_for_student(db, student.id, skip=skip, limit=limit,
+                                                  difficulty=difficulty, language=language)
+
 def list_public_problems(db: Session, skip: int, limit: int):
     return repo.get_public_problems(db, skip=skip, limit=limit)
 
