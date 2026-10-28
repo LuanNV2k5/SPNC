@@ -125,7 +125,7 @@ Trạng thái hoàn thành theo từng bài được xác định bởi sự t�
 **Quy tắc domain:**
 - Một Submission luôn gắn với một Session.
 - Mỗi Submission tham chiếu đến một CodeSnapshot (immutable).
-- Nếu code_snapshot_id null (do client chưa kịp gửi snapshot trước khi timeout), Submission vẫn được tạo với trạng thái rõ ràng — không fabricate code. (fix C-05, B5)
+- Nếu server chưa nhận được snapshot nào trước khi timeout, **không tạo Submission** — không fabricate code (UC-E02 A3, REQ-SESSION-004). (fix C-05, B5; amended by DCR SPNC_SUBMISSION_REQUIRES_SNAPSHOT, Revision 0.6)
 - Verdict không tự động sinh attention signal. Chỉ dùng làm dữ liệu cho TEACHER phân tích.
 - Submission trong Exam chỉ được tạo khi ExamParticipation.status = IN_PROGRESS.
 
@@ -420,3 +420,4 @@ Bổ sung theo yêu cầu phân tích (B5, E section):
 | 0.3 | 2026-09-19 | Final baseline: LanguageIdentifier CPP17\|PYTHON3 (OQ-22); SignalType closed enum IDLE_DETECTED\|LOC_ANOMALY\|REPEATED_FAILURE\|FAST_FIRST_CODE (Mi-NEW-02); ABANDONED policy≠idle (Mi-NEW-01); sequence_number 1-based (Mi-NEW-04); Practice+Exam concurrency V1 policy (Mi-NEW-05); SessionContext field |
 | 0.4 | 2026-10-23 | DCR SPNC_RF_RUN_EVIDENCE_CONTRACT: Align REPEATED_FAILURE evidence schema to evaluate sandbox Run records ({problem_id, target_entity, run_count, failed_count, verdicts[], time_range_start, time_range_end}), resolving conflict with §1.6:129 Submission invariants. |
 | 0.5 | 2026-10-24 | DCR SPNC_LOC_EVIDENCE_CONTRACT: Align LOC_ANOMALY evidence schema ({session_id, observed_loc, context_median_loc, delta, threshold_relative, final_loc}), distinguishing intermediate observed_loc from terminal final_loc for active sessions; zero-median cohort generates no signal. |
+| 0.6 | 2026-10-28 | DCR SPNC_SUBMISSION_REQUIRES_SNAPSHOT: §1.6 — no Submission is created when no snapshot was received before timeout (aligns with UC-E02 A3 and REQ-SESSION-004; docs/36 D1) |

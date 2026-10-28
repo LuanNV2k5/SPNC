@@ -280,3 +280,65 @@ Change:
 
 Compatibility:
 - `attention_signals.status` is `String(20)`. Before Phase 09 only `NEW` was ever written, so no stored rows change.
+
+---
+
+## Decision: Phase 10 Submission & Exam Lifecycle Specification Approval
+
+Date:
+2026-10-28
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-28): "Duyệt theo khuyến nghị". All recommendations D1–D14 in `docs/36_SUBMISSION_AND_EXAM_LIFECYCLE.md` §9 are approved without overrides.
+
+Approved Decisions (summary):
+D1 no snapshot → no Submission; D2 submit ends the session; D3 normalized output comparison; D4 first-failing verdict + weighted score; D5 best submission per exam problem; D6 no automatic re-judge; D7 sample-only detail for students; D8 enums aligned to domain; D9 no rate limit; D10 separate exam scheduler daemon; D11 status + time window for exam access; D12 per-problem judge limits capped by global maxima; D13 admin cancel limited to DRAFT/SCHEDULED until OQ-23; D14 result visibility (practice always, exam after ENDED + `allow_view_result_after`).
+
+---
+
+## Decision: DCR SPNC_SUBMISSION_REQUIRES_SNAPSHOT
+
+Date:
+2026-10-28
+
+Status:
+APPROVED_DOMAIN_AMENDMENT
+
+Approval Source:
+Project Owner explicit authorization (2026-10-28), docs/36 D1.
+
+Scope:
+`docs/01_DOMAIN.md` §1.6 (Revision 0.6)
+
+Change:
+- Old: "Nếu code_snapshot_id null … Submission vẫn được tạo với trạng thái rõ ràng".
+- New: no Submission is created when the server received no snapshot before timeout.
+
+Reason:
+§1.6 contradicted UC-E02 A3 and REQ-SESSION-004, which both forbid creating a submission without server-received code. A null-code submission also cannot be judged.
+
+Compatibility:
+- No stored data affected: no Submission rows are created by pre-Phase 10 code.
+- `submissions.snapshot_id` stays NOT NULL.
+
+---
+
+## Decision: DCR SPNC_ADMIN_CANCEL_SCOPE
+
+Date:
+2026-10-28
+
+Status:
+APPROVED_BEHAVIOUR_CORRECTION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-28), docs/36 D13.
+
+Change:
+`PATCH /api/v1/admin/exams/{id}/cancel` only accepts DRAFT/SCHEDULED exams. ONGOING returns 409 `EXAM_ONGOING_CANCEL_UNDECIDED` until OQ-23 is decided.
+
+Reason:
+Phase 04 allowed ADMIN to cancel ONGOING exams. That contradicts OQ-23's current assumption and `00_SCOPE.md` NG12.
