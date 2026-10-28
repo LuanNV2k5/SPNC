@@ -441,18 +441,33 @@ def get_sessions_by_student(db: Session, student_id: uuid.UUID, skip: int = 0, l
     return items, total
 
 
-def end_session(db: Session, session: CodingSession, termination_source: str = "STUDENT") -> CodingSession:
-    session.status = SessionStatus.ENDED.value
-    session.termination_source = termination_source
-    session.ended_at = datetime.now(timezone.utc)
-    db.flush()
-    return session
+def lock_session_for_finalize(db: Session, session_id: uuid.UUID) -> Optional[CodingSession]:
+    """SELECT ... FOR UPDATE: serializes finalization against trace ingest (FOR KEY SHARE)."""
+    return (
+        db.query(CodingSession)
+        .filter(CodingSession.id == session_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
 
 
-def abandon_session(db: Session, session: CodingSession, termination_source: str = "SYSTEM_SESSION_POLICY") -> CodingSession:
-    session.status = SessionStatus.ABANDONED.value
+def mark_session_terminated(
+    db: Session,
+    session: CodingSession,
+    status: SessionStatus,
+    termination_source: str,
+    ended_at: datetime,
+    final_loc: Optional[int],
+    working_time_seconds: int,
+    final_code_snapshot_id: Optional[uuid.UUID],
+) -> CodingSession:
+    session.status = status.value
     session.termination_source = termination_source
-    session.ended_at = datetime.now(timezone.utc)
+    session.ended_at = ended_at
+    session.final_loc = final_loc
+    session.working_time_seconds = working_time_seconds
+    session.final_code_snapshot_id = final_code_snapshot_id
     db.flush()
     return session
 

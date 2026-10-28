@@ -39,6 +39,11 @@ class CodingSession(Base, TimestampMixin):
     first_code_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Termination facts computed server-side at finalization (REQ-SIGNAL-001, REQ-TRACE-015)
+    final_loc: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    working_time_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    final_code_snapshot_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("code_snapshots.id", ondelete="RESTRICT", name="fk_coding_sessions_final_code_snapshot_id", use_alter=True), nullable=True)
+
     student: Mapped["User"] = relationship("User")
     problem: Mapped["Problem"] = relationship("Problem")
     exam_participation: Mapped[Optional["ExamParticipation"]] = relationship("ExamParticipation")
@@ -54,6 +59,8 @@ class CodingSession(Base, TimestampMixin):
             "language IN ('CPP17', 'PYTHON3')",
             name="ck_coding_sessions_language_canonical"
         ),
+        CheckConstraint('final_loc >= 0', name='ck_coding_sessions_final_loc_non_negative'),
+        CheckConstraint('working_time_seconds >= 0', name='ck_coding_sessions_working_time_non_negative'),
     )
 
 class PracticeAttempt(Base, TimestampMixin):

@@ -133,7 +133,7 @@ def _process_loc_sessions(db: Session, since_dt: datetime, batch_size: int, metr
     while True:
         stmt = (
             select(CodingSession)
-            .join(CodeSnapshot)
+            .join(CodeSnapshot, CodeSnapshot.session_id == CodingSession.id)
             .where(CodeSnapshot.created_at >= since_dt)
             .distinct()
             .order_by(CodingSession.id)

@@ -59,7 +59,7 @@ class CodeSnapshot(Base, TimestampMixin):
     object_key: Mapped[str] = mapped_column(String(1024), unique=True)
     line_count: Mapped[int] = mapped_column(Integer)
 
-    session: Mapped["CodingSession"] = relationship("CodingSession")
+    session: Mapped["CodingSession"] = relationship("CodingSession", foreign_keys=[session_id])
 
 class ScratchpadRevision(Base):
     __tablename__ = "scratchpad_revisions"

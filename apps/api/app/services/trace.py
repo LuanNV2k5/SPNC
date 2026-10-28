@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User, RoleEnum
 from app.models.session import CodingSession, SessionStatus
+from app.models.trace import TraceEventType
 from app.schemas.trace import TraceBatchRequest, SnapshotCreate
 from app.repositories import trace as repo
 from app.repositories import academic as academic_repo
@@ -30,7 +31,14 @@ def _generate_fingerprint(event_type: str, payload: dict) -> str:
 
 def ingest_trace_batch(db: Session, student: User, session_id: uuid.UUID, req: TraceBatchRequest) -> int:
     session = _get_student_session(db, student, session_id)
-    
+
+    # D4: SESSION_ENDED is server-authored only (written by session finalization)
+    if any(e.event_type == TraceEventType.SESSION_ENDED for e in req.events):
+        raise HTTPException(status_code=422, detail=_error("TRACE_EVENT_TYPE_RESERVED", "SESSION_ENDED is recorded by the server when a session ends"))
+
+    # Serialize against finalization so no client event lands after SESSION_ENDED (docs/34 S5)
+    session = repo.lock_session_for_ingest(db, session_id)
+
     if session.status != SessionStatus.ACTIVE.value:
         raise HTTPException(status_code=403, detail=_error("SESSION_NOT_ACTIVE", "Cannot append trace to an inactive session unless exact duplicate (which this endpoint checks natively by sequence but we reject new). Wait, requirements say: 'ENDED rejects new non-duplicate trace'. Exact retry semantics after end explicitly tested."))
     # To support exact duplicates after ENDED, we must let them through to the repo which checks fingerprint.

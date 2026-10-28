@@ -307,7 +307,7 @@ This matrix establishes the precise mapping of all authoritative requirements re
 | **REQ-IDLE-001** | `docs/03_REQUIREMENTS.md:128` | Calculate idle interval between meaningful events (`EDITOR_CHANGE`, `RUN_EXECUTED`, `SUBMISSION_MADE`) | **IMPLEMENTED (08D)** | Active-tail inactivity (`evaluate_idle_detected`) plus closed inter-event gaps via the transactional outbox (`evaluate_historical_idle_gaps`), both using Phase 06 enums `EDITOR_CHANGED`, `RUN_REQUESTED`, `SUBMISSION_CREATED`. `SESSION_CHECKPOINT` is excluded (§4.1). Ratified by DCR SPNC_IDLE_HISTORICAL_GAP_CONTRACT (2026-10-28). |
 | **REQ-IDLE-002** | `docs/03_REQUIREMENTS.md:129` | Create `IDLE_DETECTED` signal when gap >= threshold; evidence requires `{start_time, end_time, duration_seconds, meaningful_event_before_id, threshold_used}` | **IMPLEMENTED (08D)** | Both IDLE modes emit all five canonical keys, including `meaningful_event_before_id` (null when the gap starts at `opened_at`). Legacy keys are kept alongside them. |
 | **REQ-IDLE-003** | `docs/03_REQUIREMENTS.md:130` | Factual wording only; no negative or judgmental student labels | **VERIFIED** | Code, evidence JSON, and logs contain zero judgmental terms. Aligns with Rule #20. |
-| **REQ-SIGNAL-001**| `docs/03_REQUIREMENTS.md:136` | Calculate `Session.final_loc` on session completion; `SESSION_ENDED` event must contain `final_loc` | **MISSING** | `CodingSession` model lacks `final_loc` column. Neither Phase 06/07 session termination nor Phase 08 signal engine implements final LOC calculation. Was misattributed to `FAST_FIRST_CODE` in early drafts (see GAP-08D-01). |
+| **REQ-SIGNAL-001**| `docs/03_REQUIREMENTS.md:136` | Calculate `Session.final_loc` on session completion; `SESSION_ENDED` event must contain `final_loc` | **RESOLVED (08E)** | `CodingSession.final_loc` computed server-side at finalization; `SESSION_ENDED` carries it (docs/34). |
 | **REQ-SIGNAL-002**| `docs/03_REQUIREMENTS.md:137` | `LOC_ANOMALY` must use relative threshold, no hardcoded absolute threshold | **IMPLEMENTED (08D)** | Relative cohort median deviation only (no fixed limit). Canonical keys follow DCR SPNC_LOC_EVIDENCE_CONTRACT. LOC counting fixed to use real line breaks (§4 note). `final_loc` stays null until Phase 08E (GAP-08D-01) lands. |
 | **REQ-SIGNAL-003**| `docs/03_REQUIREMENTS.md:138` | Non-empty, verifiable evidence JSON per §1.8 schemas | **IMPLEMENTED (08D)** | All four evaluators emit the canonical §1.8 keys (as amended by the approved RF and LOC DCRs) plus legacy diagnostic keys (dual-key, see GAP-08D-04). |
 | **REQ-SIGNAL-004**| `docs/03_REQUIREMENTS.md:139` | Strictly objective; never conclude cheating or lack of comprehension | **VERIFIED** | Enforced across all heuristics, logs, and database payloads. Aligns with Rule #20. |
@@ -333,7 +333,7 @@ REGRESSION_TEST_REQUIRED: Session lifecycle tests (test_session.py, test_trace.p
 MIGRATION_REQUIRED: YES (new migration revision required; historical migrations 0e709d2dde7d, dbef5bd08cb7, b5a47a071aaf, 51377aaa532a must remain untouched).
 OPEN_DECISION: Since REQ-SIGNAL-001 is a Session lifecycle requirement (UC-E02) rather than a background heuristic, decide whether to implement this in a dedicated Session Hardening sub-phase or defer to Phase 09.
 RESOLUTION: Project Owner chose a dedicated Session Hardening sub-phase (Phase 08E), 2026-10-28. Spec: docs/34_SESSION_HARDENING.md.
-STATUS: DECIDED — SCHEDULED FOR PHASE 08E
+STATUS: RESOLVED — implemented in Phase 08E (migration e5a1c3f09b27, app/services/session_lifecycle.py; verification in docs/34 §9.3)
 ```
 
 ```
@@ -485,4 +485,4 @@ No API routes, UI files or student endpoints were added (AC-08D-14: route diff v
 ### 15.3 Known Limitations Carried Forward
 - `StorageAdapter` is in-memory per process. The scheduler daemon cannot read snapshots that the API process uploaded, so `LOC_ANOMALY` and `REPEATED_FAILURE` need a shared blob store (S3/MinIO) before production use.
 - `RunService.get_run` / `list_runs` allow any TEACHER, without class scoping (PROJECT_RULES #12). Track for Phase 09.
-- GAP-08D-01 (`final_loc`) is scheduled for Phase 08E Session Hardening (`docs/34_SESSION_HARDENING.md`).
+- GAP-08D-01 (`final_loc`) resolved in Phase 08E Session Hardening (`docs/34_SESSION_HARDENING.md`).

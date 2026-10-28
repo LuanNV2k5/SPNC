@@ -154,3 +154,33 @@ def get_scratchpad_history(db: Session, session_id: uuid.UUID, skip: int, limit:
     count_stmt = select(func.count(ScratchpadRevision.id)).where(ScratchpadRevision.session_id == session_id)
     total = db.scalar(count_stmt) or 0
     return items, total
+
+def lock_session_for_ingest(db: Session, session_id: uuid.UUID) -> Optional[CodingSession]:
+    """
+    SELECT ... FOR KEY SHARE: conflicts with finalization (FOR UPDATE) so no event lands
+    after SESSION_ENDED, but not with the signal outbox claim (FOR NO KEY UPDATE).
+    """
+    stmt = (
+        select(CodingSession)
+        .where(CodingSession.id == session_id)
+        .with_for_update(read=True, key_share=True)
+        .execution_options(populate_existing=True)
+    )
+    return db.scalar(stmt)
+
+def get_max_sequence(db: Session, session_id: uuid.UUID) -> int:
+    return db.scalar(select(func.max(TraceEvent.sequence_number)).where(TraceEvent.session_id == session_id)) or 0
+
+def get_latest_snapshot(db: Session, session_id: uuid.UUID) -> Optional[CodeSnapshot]:
+    stmt = (
+        select(CodeSnapshot)
+        .where(CodeSnapshot.session_id == session_id)
+        .order_by(CodeSnapshot.created_at.desc(), CodeSnapshot.id.desc())
+        .limit(1)
+    )
+    return db.scalar(stmt)
+
+def append_server_event(db: Session, event: TraceEvent) -> TraceEvent:
+    db.add(event)
+    db.flush()
+    return event

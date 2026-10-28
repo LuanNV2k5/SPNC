@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     JUDGE_TEMP_DIR: str = "/tmp/spnc_judge"
 
     # Judge Signals
-    SIGNAL_RULE_VERSION: str = "1.0.0"
+    SIGNAL_RULE_VERSION: str = "1.1.0"  # 1.1.0: LOC_ANOMALY final_loc after finalization (docs/34 D7)
     SIGNAL_IDLE_THRESHOLD_SECONDS: int = 300
     SIGNAL_FAST_FIRST_CODE_THRESHOLD_SECONDS: int = 30
     SIGNAL_REPEATED_FAILURE_MIN_ATTEMPTS: int = 3

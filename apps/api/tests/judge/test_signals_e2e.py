@@ -255,7 +255,7 @@ def test_complete_session_lifecycle_all_four_signals_e2e(db: Session, student_us
     for sig in signals:
         assert sig.student_id == student_user.id
         assert sig.rule_version == settings.SIGNAL_RULE_VERSION
-        assert sig.rule_version == "1.0.0"
+        assert sig.rule_version == "1.1.0"
         assert isinstance(sig.evidence, dict)
         assert len(sig.evidence) > 0
 

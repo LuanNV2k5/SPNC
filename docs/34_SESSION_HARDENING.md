@@ -1,7 +1,7 @@
 # 34 — SESSION HARDENING (PHASE 08E) SPECIFICATION
 
 > **Module:** Session Lifecycle (Phase 08E)
-> **Status:** APPROVED 2026-10-28 (all §8 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-28 (all §8 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED (`phase-08e-session-hardening-locked`)
 > **Date:** 2026-10-28
 > **Parent Baseline:** `phase-08-signal-locked` (`a74e5d1`) + docs commit `7c7d9f9`
 > **Proposed Branch:** `phase08e`
@@ -127,7 +127,7 @@ All errors keep the `{error_code, message, request_id}` envelope (PROJECT_RULES 
 | 4. Endpoint/schema wiring | `app/services/academic.py`, `app/schemas/academic.py` (`EndSessionRequest`, `SessionResponse`) |
 | 5. Ingest hardening | `app/services/trace.py`, `app/repositories/trace.py` |
 | 6. (D7 only) LOC evidence | `app/services/judge/signals.py`, `config.SIGNAL_RULE_VERSION` |
-| 7. Tests | new `test_session_lifecycle.py`, `test_session_concurrency.py`; extend `test_trace.py`, `test_academic.py` |
+| 7. Tests | new `tests/api/test_session_lifecycle.py` (lifecycle + lock-semantics tests in one file); `test_academic.py` P05-S14 amended for D5; `test_signals_algorithms.py` D7 test |
 | 8. Docs | this file §9 verification record; `docs/33` §10 GAP-08D-01 → RESOLVED |
 
 Router stays thin and the business logic lives in services (PROJECT_RULES #6–7).
@@ -154,4 +154,31 @@ Approval of this document (all recommendations, or with per-decision overrides) 
 
 ## 9. Verification Record
 
-*To be completed at Phase 08E closure.*
+
+### 9.1 Changes (2026-10-28)
+| Area | File | Change |
+|---|---|---|
+| Migration | `alembic/versions/e5a1c3f09b27_phase08e_session_finalization.py` | `final_loc`, `working_time_seconds`, `final_code_snapshot_id` (FK RESTRICT) + non-negative CHECKs. Constraint names follow the existing doubled `ck_<table>_ck_<table>_…` naming convention. |
+| Model | `app/models/session.py`, `app/models/trace.py` | New columns (`use_alter` FK because the two tables now reference each other). `CodeSnapshot.session` gets explicit `foreign_keys`. |
+| Service | `app/services/session_lifecycle.py` (new), `app/services/loc.py` (new) | `finalize_session` / `abandon_session`; shared `count_loc`. |
+| Repository | `app/repositories/academic.py`, `app/repositories/trace.py` | `lock_session_for_finalize` (FOR UPDATE) and `mark_session_terminated` replace `end_session`/`abandon_session`. Adds `lock_session_for_ingest` (FOR KEY SHARE), `get_max_sequence`, `get_latest_snapshot`, `append_server_event`. |
+| API | `app/services/academic.py`, `app/schemas/academic.py` | D5 (422 `TERMINATION_SOURCE_FORBIDDEN`), D6 (`last_sequence_number`, 409 `TRACE_NOT_FLUSHED`). `SessionResponse` exposes the three new fields. |
+| Ingest | `app/services/trace.py` | D4 (422 `TRACE_EVENT_TYPE_RESERVED`) and the ingest lock. |
+| Signals | `app/services/judge/signals.py`, `materializer.py`, `core/config.py` | D7 `final_loc` for non-ACTIVE sessions. `SIGNAL_RULE_VERSION = "1.1.0"`. Explicit snapshot/session join conditions. |
+| Storage | `app/services/storage.py` | `exists_code_snapshot`: if snapshot content is unavailable, `final_loc` is null rather than 0. |
+
+### 9.2 Behaviour Changes to Earlier Phases
+- **Phase 05 `P05-S14`:** previously asserted that a student may end a session as `SYSTEM_EXAM_TIMEOUT` (finding F1). It now asserts 422 (D5).
+- **Phase 06 ingest:** `SESSION_ENDED` is rejected (D4).
+- **Signals:** new signals carry `rule_version = "1.1.0"`. Stored signals are unchanged.
+- **Locking:** finalization uses `FOR UPDATE`, which conflicts with the outbox worker's `FOR NO KEY UPDATE`. An end request can therefore wait for one in-progress outbox chunk (bounded at 500 events). Ingest is unaffected (AC-08E-09).
+
+### 9.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| AC-08E-01 migration | Fresh DB `spnc_phase08e_fresh`, PostgreSQL 16.15 | base → `e5a1c3f09b27` OK; downgrade to `c4819d7a2e10` removes the 3 columns; re-upgrade OK |
+| AC-08E-02..10 (`tests/api/test_session_lifecycle.py`) | Disposable PostgreSQL 16, `spnc_phase08e_session_test` | **15 passed** |
+| Phase 08 suite (`tests/judge/test_signals_*`, `test_scheduler_*`, `test_trace_outbox_schema`, `tests/db`), incl. D7 test | `spnc_phase08e_fresh` | **90 passed** |
+| Phase 03–07 regression (`tests/api/*`, `test_fencing`, `test_queue`, `test_adapters`, `test_sandbox_security`) | Disposable PostgreSQL 16, each DB migrated to head; Redis; Docker sandbox | **262 passed** (58 + 27 + 3 + 90 + 15 + 16 + 10 + 6 + 24 + 13) |
+| AC-08E-12 scope fence | `git diff phase-08-signal-locked` | 0 new routes, 0 UI files, no exam sweeper |
+| Ethics grep on `apps/api/app` | static | 0 hits |

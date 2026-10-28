@@ -27,5 +27,12 @@ class StorageAdapter:
         """
         return self._memory_store.get(object_key, "")
 
+    def exists_code_snapshot(self, object_key: str) -> bool:
+        """
+        Reports whether snapshot content is retrievable, so callers can tell
+        "empty code" apart from "content unavailable".
+        """
+        return object_key in self._memory_store
+
 # Singleton instance for injection/usage
 storage_adapter = StorageAdapter()

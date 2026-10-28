@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +260,10 @@ class StartExamSessionRequest(BaseModel):
 
 
 class EndSessionRequest(BaseModel):
-    termination_source: str = "STUDENT"
+    # Only "STUDENT" (or omitted) is accepted from clients (docs/34 D5)
+    termination_source: Optional[str] = None
+    # Flush guard: highest sequence_number the client has sent (docs/34 D6)
+    last_sequence_number: Optional[int] = Field(default=None, ge=0)
 
 
 class SessionResponse(BaseModel):
@@ -275,6 +278,9 @@ class SessionResponse(BaseModel):
     termination_source: Optional[str]
     opened_at: datetime
     ended_at: Optional[datetime]
+    final_loc: Optional[int] = None
+    working_time_seconds: Optional[int] = None
+    final_code_snapshot_id: Optional[uuid.UUID] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -1356,7 +1356,8 @@ class TestSessionManagement:
         assert r2.json()["error_code"] == "SESSION_FORBIDDEN"
 
     def test_P05_S14_system_exam_timeout_termination_source(self, db_session):
-        """P05-S14: SYSTEM_EXAM_TIMEOUT is a valid termination source (ABANDONED semantics preserved)."""
+        """P05-S14 (amended by Phase 08E D5): SYSTEM_EXAM_TIMEOUT is a valid actor, but only for
+        internal callers. A student request claiming it is rejected with 422."""
         _, s, _, tok_s, pid = self._setup_student_with_public_problem(db_session, "14")
         r1 = client.post("/api/v1/my/practice/sessions",
                          json={"problem_id": pid, "language": "CPP17"},
@@ -1365,8 +1366,8 @@ class TestSessionManagement:
         r2 = client.post(f"/api/v1/my/practice/sessions/{sid}/end",
                          json={"termination_source": "SYSTEM_EXAM_TIMEOUT"},
                          headers=_auth(tok_s))
-        assert r2.status_code == 200
-        assert r2.json()["termination_source"] == "SYSTEM_EXAM_TIMEOUT"
+        assert r2.status_code == 422
+        assert r2.json()["error_code"] == "TERMINATION_SOURCE_FORBIDDEN"
 
     def test_P05_S15_multiple_practice_sessions_allowed(self, db_session):
         """P05-S15: Student can start multiple practice sessions on same problem."""

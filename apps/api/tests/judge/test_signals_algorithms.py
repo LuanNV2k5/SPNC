@@ -94,7 +94,7 @@ def test_idle_exactly_threshold(db_session, setup_user_and_session):
     signal = evaluate_idle_detected(session, db_session)
     assert signal is not None
     assert signal.signal_type == SignalType.IDLE_DETECTED
-    assert signal.rule_version == "1.0.0"
+    assert signal.rule_version == "1.1.0"
     # Authoritative REQ-IDLE-002 fields
     assert signal.evidence["start_time"] == event_time.isoformat()
     assert "end_time" in signal.evidence
@@ -111,7 +111,7 @@ def test_idle_no_prior_meaningful_event_boundary(db_session, setup_user_and_sess
     signal = evaluate_idle_detected(session, db_session)
     assert signal is not None
     assert signal.signal_type == SignalType.IDLE_DETECTED
-    assert signal.rule_version == "1.0.0"
+    assert signal.rule_version == "1.1.0"
     assert signal.evidence["start_time"] == session.opened_at.isoformat()
     assert "end_time" in signal.evidence
     assert signal.evidence["duration_seconds"] >= 400
@@ -183,7 +183,7 @@ def test_fast_first_code_inside(db_session, setup_user_and_session):
     assert signal is not None
     assert signal.signal_type == SignalType.FAST_FIRST_CODE
     assert signal.rule_version is not None
-    assert signal.rule_version == "1.0.0"
+    assert signal.rule_version == "1.1.0"
 
     # Authoritative canonical evidence fields (01_DOMAIN.md §1.8 / REQ-SIGNAL-003)
     assert "problem_open_time" in signal.evidence
@@ -254,7 +254,7 @@ def test_fast_first_code_exact_threshold_boundary(db_session, setup_user_and_ses
     assert signal.evidence["threshold_seconds"] == threshold
     assert signal.evidence["problem_open_time"] == session.opened_at.isoformat()
     assert signal.evidence["first_code_event_time"] == event_time.isoformat()
-    assert signal.rule_version == "1.0.0"
+    assert signal.rule_version == "1.1.0"
 
 def test_fast_first_code_just_above_threshold(db_session, setup_user_and_session):
     # Tests just above boundary: elapsed > threshold_seconds returns None
@@ -320,7 +320,7 @@ def test_rf_qualifies(db_session, setup_user_and_session):
     signal = evaluate_repeated_failure(session, db_session)
     assert signal is not None
     assert signal.signal_type == SignalType.REPEATED_FAILURE
-    assert signal.rule_version == "1.0.0"
+    assert signal.rule_version == "1.1.0"
 
     # Canonical evidence contract (DCR SPNC_RF_RUN_EVIDENCE_CONTRACT / docs/01_DOMAIN.md §1.8)
     assert "problem_id" in signal.evidence
@@ -509,7 +509,7 @@ def test_loc_anomaly(db_session, setup_user_and_session):
     signal = evaluate_loc_anomaly(session, db_session)
     assert signal is not None
     assert signal.signal_type == SignalType.LOC_ANOMALY
-    assert signal.rule_version == "1.0.0"
+    assert signal.rule_version == "1.1.0"
     
     # Canonical evidence contract (DCR SPNC_LOC_EVIDENCE_CONTRACT / docs/01_DOMAIN.md §1.8)
     assert signal.evidence["session_id"] == str(session.id)
@@ -755,7 +755,7 @@ def test_historical_idle_two_consecutive_meaningful_events(db_session, setup_use
     assert len(signals) == 1
     sig = signals[0]
     assert sig.signal_type == SignalType.IDLE_DETECTED
-    assert sig.rule_version == "1.0.0"
+    assert sig.rule_version == "1.1.0"
     assert sig.evidence["duration_seconds"] == 400.0
     assert sig.evidence["start_time"] == t1.isoformat()
     assert sig.evidence["end_time"] == t2.isoformat()
@@ -886,3 +886,38 @@ def test_loc_and_change_ratio_use_real_line_breaks():
     assert _count_loc(code_crlf) == 3
     assert _code_change_ratio(code_lf, code_crlf) == 0.0
     assert _code_change_ratio(code_lf, "def solve():\n    x = 2\n\n    return x\n") > 0.0
+
+def test_loc_anomaly_final_loc_after_finalization(db_session, setup_user_and_session):
+    # docs/34 D7 (rule 1.1.0): null while ACTIVE, Session.final_loc once the session is finalized
+    from app.models.session import PracticeAttempt
+    student, problem, session = setup_user_and_session
+    cls = Class(name="C-D7", academic_year="2026", owner_id=student.id)
+    db_session.add(cls)
+    db_session.flush()
+    db_session.add(ClassMembership(class_id=cls.id, student_id=student.id))
+    for _ in range(3):
+        u_id = uuid.uuid4()
+        u = User(email=f"u_{u_id}@test.com", password_hash="hash", role=RoleEnum.STUDENT, username=f"u_{u_id}", full_name="U")
+        db_session.add(u)
+        db_session.flush()
+        db_session.add(ClassMembership(class_id=cls.id, student_id=u.id))
+        attempt = PracticeAttempt(student_id=u.id, problem_id=problem.id)
+        db_session.add(attempt)
+        db_session.flush()
+        peer = CodingSession(student_id=u.id, problem_id=problem.id, language=SupportedLanguage.PYTHON3, practice_attempt_id=attempt.id)
+        db_session.add(peer)
+        db_session.flush()
+        _create_snapshot(db_session, peer, "\n".join(f"line {j}" for j in range(10)), 1)
+    _create_snapshot(db_session, session, "\n".join(f"line {j}" for j in range(50)), 1)
+
+    active_signal = evaluate_loc_anomaly(session, db_session)
+    assert active_signal.evidence["final_loc"] is None
+
+    session.status = SessionStatus.ENDED.value
+    session.final_loc = 50
+    db_session.commit()
+
+    ended_signal = evaluate_loc_anomaly(session, db_session)
+    assert ended_signal.evidence["final_loc"] == 50
+    assert ended_signal.evidence["observed_loc"] == 50
+    assert ended_signal.rule_version == "1.1.0"

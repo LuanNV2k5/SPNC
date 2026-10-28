@@ -421,15 +421,23 @@ def get_practice_session(db: Session, student: User, session_id: uuid.UUID):
         raise HTTPException(status_code=404, detail=_error("SESSION_NOT_FOUND", "Session not found"))
     return s
 
+def _finalize_student_end(db: Session, s, req: EndSessionRequest):
+    # D5: a student can only end their own session as STUDENT; SYSTEM_* actors are internal-only
+    if req.termination_source not in (None, "STUDENT"):
+        raise HTTPException(
+            status_code=422,
+            detail=_error("TERMINATION_SOURCE_FORBIDDEN", "Students can only end a session with termination_source STUDENT"),
+        )
+    from app.models.session import SessionStatus, TerminationSource
+    from app.services.session_lifecycle import finalize_session
+    return finalize_session(
+        db, s.id, SessionStatus.ENDED, TerminationSource.STUDENT,
+        last_sequence_number=req.last_sequence_number,
+    )
+
 def end_practice_session(db: Session, student: User, session_id: uuid.UUID, req: EndSessionRequest):
     s = get_practice_session(db, student, session_id)
-    from app.models.session import SessionStatus
-    sess_status = s.status if isinstance(s.status, str) else s.status.value
-    if sess_status != SessionStatus.ACTIVE.value:
-        raise HTTPException(status_code=409, detail=_error("SESSION_ALREADY_ENDED", "Session is not active"))
-
-    termination = req.termination_source if req.termination_source in ("STUDENT", "SYSTEM_EXAM_TIMEOUT", "SYSTEM_SESSION_POLICY") else "STUDENT"
-    return repo.end_session(db, s, termination_source=termination)
+    return _finalize_student_end(db, s, req)
 
 def start_exam_session(db: Session, student: User, participation_id: uuid.UUID, req: StartExamSessionRequest):
     participation = repo.get_participation_by_id(db, participation_id)
@@ -486,13 +494,7 @@ def get_exam_session(db: Session, student: User, session_id: uuid.UUID):
 
 def end_exam_session(db: Session, student: User, session_id: uuid.UUID, req: EndSessionRequest):
     s = get_exam_session(db, student, session_id)
-    from app.models.session import SessionStatus
-    sess_status = s.status if isinstance(s.status, str) else s.status.value
-    if sess_status != SessionStatus.ACTIVE.value:
-        raise HTTPException(status_code=409, detail=_error("SESSION_ALREADY_ENDED", "Session is not active"))
-
-    termination = req.termination_source if req.termination_source in ("STUDENT", "SYSTEM_EXAM_TIMEOUT", "SYSTEM_SESSION_POLICY") else "STUDENT"
-    return repo.end_session(db, s, termination_source=termination)
+    return _finalize_student_end(db, s, req)
 
 
 # ============================================================

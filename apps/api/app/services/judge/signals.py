@@ -15,6 +15,7 @@ from app.models.run_submit import Run, RunVerdict
 from app.models.class_org import ClassMembership, Class
 from app.models.problem import Problem
 from app.services.storage import storage_adapter
+from app.services.loc import count_loc
 
 # Meaningful events for IDLE_DETECTED (strictly closed domain set)
 MEANINGFUL_EVENT_TYPES = {
@@ -308,8 +309,7 @@ def evaluate_repeated_failure(session: CodingSession, db: Session) -> Optional[A
         dedup_key=dedup_key
     )
 
-def _count_loc(code: str) -> int:
-    return len([line for line in code.splitlines() if line.strip()])
+_count_loc = count_loc
 
 def evaluate_loc_anomaly(session: CodingSession, db: Session) -> Optional[AttentionSignal]:
     min_cohort = settings.SIGNAL_LOC_MIN_COHORT_SIZE
@@ -348,7 +348,7 @@ def evaluate_loc_anomaly(session: CodingSession, db: Session) -> Optional[Attent
     # Subquery to get latest snapshot per session
     subq = (
         select(CodeSnapshot.session_id, func.max(CodeSnapshot.created_at).label("max_created_at"))
-        .join(CodingSession)
+        .join(CodingSession, CodeSnapshot.session_id == CodingSession.id)
         .where(
             and_(
                 CodingSession.student_id.in_(cohort_student_ids),
@@ -413,7 +413,8 @@ def evaluate_loc_anomaly(session: CodingSession, db: Session) -> Optional[Attent
             "context_median_loc": median_loc,
             "delta": round(float(student_loc) - float(median_loc), 2),
             "threshold_relative": float(dev_policy),
-            "final_loc": None,
+            # D7 (rule 1.1.0): null while ACTIVE; the server-computed Session.final_loc once finalized
+            "final_loc": session.final_loc if session.status != SessionStatus.ACTIVE.value else None,
             # Preserved legacy diagnostic fields for backward compatibility
             "problem_id": str(session.problem_id),
             "student_loc": student_loc,
