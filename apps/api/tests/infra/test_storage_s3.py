@@ -37,7 +37,7 @@ def test_round_trip_and_bucket_created_on_first_use(s3):
     code = "print('xin chao')\n"
     source_hash, key = s3.upload_code_snapshot("sess-1", 0, code)
     assert source_hash == hashlib.sha256(code.encode()).hexdigest()
-    assert key == f"snapshots/sess-1/0_{source_hash[:8]}.txt"   # persisted key format unchanged (F6)
+    assert key == f"snapshots/sess-1/{source_hash}.txt"         # content-addressed (docs/39 D1)
     assert s3.exists_code_snapshot(key) is True
     assert s3.download_code_snapshot(key) == code
 
@@ -95,3 +95,15 @@ def test_memory_backend_unchanged_and_immutable():
     mem._memory_store[key] = "other\n"
     with pytest.raises(StorageConflict):
         mem.upload_code_snapshot("m", 0, "y\n")
+
+
+def test_list_and_delete_for_orphan_sweep(s3):
+    from datetime import datetime, timedelta, timezone
+    _, k1 = s3.upload_code_snapshot("sess-5", 0, "one\n")
+    _, k2 = s3.upload_code_snapshot("sess-5", 0, "two\n")
+    future = datetime.now(timezone.utc) + timedelta(minutes=5)
+    assert sorted(s3.list_code_snapshots(older_than=future, limit=10)) == sorted([k1, k2])
+    assert s3.list_code_snapshots(older_than=datetime.now(timezone.utc) - timedelta(hours=1), limit=10) == []
+    assert len(s3.list_code_snapshots(older_than=future, limit=1)) == 1
+    s3.delete_code_snapshot(k1)
+    assert s3.exists_code_snapshot(k1) is False and s3.exists_code_snapshot(k2) is True

@@ -104,6 +104,10 @@ class Settings(BaseSettings):
     S3_CONNECT_TIMEOUT_SECONDS: float = 2.0
     S3_READ_TIMEOUT_SECONDS: float = 10.0
     S3_MAX_RETRIES: int = 2
+    # Orphan-blob cleanup (ADR-007, docs/39 D2)
+    SNAPSHOT_ORPHAN_GRACE_HOURS: int = 24
+    SNAPSHOT_ORPHAN_SWEEP_INTERVAL_SECONDS: int = 3600
+    SNAPSHOT_ORPHAN_BATCH_SIZE: int = 500
 
     # Teacher notification WebSocket (docs/35 09C)
     WS_AUTH_TIMEOUT_SECONDS: float = 5.0

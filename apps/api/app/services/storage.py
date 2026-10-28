@@ -9,7 +9,8 @@ Backends (docs/37 D2): "memory" keeps content in a per-process dict (tests and l
 import hashlib
 import io
 import logging
-from typing import Optional, Tuple
+from datetime import datetime, timezone
+from typing import List, Optional, Tuple
 
 from app.core.config import settings
 
@@ -29,6 +30,7 @@ class StorageAdapter:
         self.backend = (backend or settings.STORAGE_BACKEND).lower()
         self.bucket_name = bucket_name or settings.S3_BUCKET
         self._memory_store = {}
+        self._memory_created = {}
         self._client = None
         self._bucket_ready = False
 
@@ -84,13 +86,16 @@ class StorageAdapter:
     def upload_code_snapshot(self, session_id: str, sequence: int, content: str) -> Tuple[str, str]:
         """Stores content and returns (source_hash, object_key)."""
         source_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-        # Key format is persisted in code_snapshots.object_key; unchanged (docs/37 F6)
-        object_key = f"snapshots/{session_id}/{sequence}_{source_hash[:8]}.txt"
+        # Content-addressed (ADR-007, docs/39 D1): identical code in a session maps to one blob.
+        # `sequence` is kept for API compatibility and no longer part of the key.
+        object_key = f"snapshots/{session_id}/{source_hash}.txt"
 
         if self.backend != "s3":
             existing = self._memory_store.get(object_key)
             if existing is not None and existing != content:
                 raise StorageConflict(object_key)
+            if existing is None:
+                self._memory_created[object_key] = datetime.now(timezone.utc)
             self._memory_store[object_key] = content
             return source_hash, object_key
 
@@ -129,6 +134,38 @@ class StorageAdapter:
             if self._is_missing(e):
                 return False
             raise StorageUnavailable(f"Cannot stat {object_key}: {e}") from e
+
+    # -- Orphan cleanup support (docs/39 13A) -------------------------------------
+    def list_code_snapshots(self, older_than: datetime, limit: int) -> List[str]:
+        """Keys under snapshots/ last written before `older_than` (at most `limit`)."""
+        if self.backend != "s3":
+            keys = [k for k in self._memory_store
+                    if k.startswith("snapshots/") and self._memory_created.get(k, datetime.now(timezone.utc)) < older_than]
+            return keys[:limit]
+        keys = []
+        try:
+            for obj in self._s3().list_objects(self.bucket_name, prefix="snapshots/", recursive=True):
+                if obj.last_modified is not None and obj.last_modified < older_than:
+                    keys.append(obj.object_name)
+                    if len(keys) >= limit:
+                        break
+        except StorageUnavailable:
+            raise
+        except Exception as e:
+            raise StorageUnavailable(f"Cannot list snapshots: {e}") from e
+        return keys
+
+    def delete_code_snapshot(self, object_key: str) -> None:
+        if self.backend != "s3":
+            self._memory_store.pop(object_key, None)
+            self._memory_created.pop(object_key, None)
+            return
+        try:
+            self._s3().remove_object(self.bucket_name, object_key)
+        except StorageUnavailable:
+            raise
+        except Exception as e:
+            raise StorageUnavailable(f"Cannot delete {object_key}: {e}") from e
 
 
 # Singleton instance for injection/usage

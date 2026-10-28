@@ -56,7 +56,8 @@ class CodeSnapshot(Base, TimestampMixin):
     language: Mapped[str] = mapped_column(String(50))
 
     source_hash: Mapped[str] = mapped_column(String(255))
-    object_key: Mapped[str] = mapped_column(String(1024), unique=True)
+    # Content-addressed; several rows may share one blob (docs/39 D1)
+    object_key: Mapped[str] = mapped_column(String(1024), index=True)
     line_count: Mapped[int] = mapped_column(Integer)
 
     session: Mapped["CodingSession"] = relationship("CodingSession", foreign_keys=[session_id])
