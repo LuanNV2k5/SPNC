@@ -11,6 +11,7 @@ import uuid
 
 
 from app.core.config import settings
+from app.services.storage import StorageConflict, StorageUnavailable
 
 from app.api.endpoints import auth
 
@@ -58,6 +59,23 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
     return JSONResponse(status_code=exc.status_code, content=detail)
 
+
+
+@app.exception_handler(StorageUnavailable)
+async def storage_unavailable_handler(request: Request, exc: StorageUnavailable):
+    # docs/37 D6: transient and retryable; no metadata row is written (upload-first)
+    return JSONResponse(status_code=503, content={
+        "error_code": "STORAGE_UNAVAILABLE", "message": "Snapshot storage is unavailable, retry later",
+        "request_id": getattr(request.state, "request_id", ""),
+    })
+
+
+@app.exception_handler(StorageConflict)
+async def storage_conflict_handler(request: Request, exc: StorageConflict):
+    return JSONResponse(status_code=409, content={
+        "error_code": "SNAPSHOT_CONTENT_CONFLICT", "message": "A different snapshot already exists under this key",
+        "request_id": getattr(request.state, "request_id", ""),
+    })
 
 
 @app.exception_handler(RequestValidationError)

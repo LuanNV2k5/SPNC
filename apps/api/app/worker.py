@@ -8,7 +8,7 @@ from app.models.run_submit import RunStatus
 from app.models.trace import CodeSnapshot
 from app.repositories.run import run_repository
 from app.services.judge.adapters import ADAPTERS
-from app.services.storage import storage_adapter
+from app.services.storage import StorageUnavailable, storage_adapter
 from app.services.submission import judge_submission
 import redis
 
@@ -49,7 +49,12 @@ def process_run(db, run_id: uuid.UUID):
         return
 
     # Snapshot content lives in storage, keyed by object_key (never fabricate empty source)
-    if not storage_adapter.exists_code_snapshot(snapshot.object_key):
+    try:
+        available = storage_adapter.exists_code_snapshot(snapshot.object_key)
+        source_code = storage_adapter.download_code_snapshot(snapshot.object_key) if available else None
+    except StorageUnavailable:
+        source_code = None
+    if source_code is None:
         run_repository.write_result(
             db, run_id, execution_generation,
             status=RunStatus.FAILED_INTERNAL, verdict="INTERNAL_ERROR",
@@ -62,7 +67,6 @@ def process_run(db, run_id: uuid.UUID):
 
     # 3. Execute Sandbox
     try:
-        source_code = storage_adapter.download_code_snapshot(snapshot.object_key)
         result_dict = adapter.execute(source_code, input_data)
 
         # Update testcase_results preserving existing input

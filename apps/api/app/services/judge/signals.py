@@ -14,7 +14,7 @@ from app.models.trace import TraceEvent, TraceEventType, CodeSnapshot
 from app.models.run_submit import Run, RunVerdict
 from app.models.class_org import ClassMembership, Class
 from app.models.problem import Problem
-from app.services.storage import storage_adapter
+from app.services.storage import StorageUnavailable, storage_adapter
 from app.services.loc import count_loc
 
 # Meaningful events for IDLE_DETECTED (strictly closed domain set)
@@ -269,8 +269,12 @@ def evaluate_repeated_failure(session: CodingSession, db: Session) -> Optional[A
         s1 = snap_map.get(runs[i-1].snapshot_id)
         s2 = snap_map.get(runs[i].snapshot_id)
         if s1 and s2:
-            c1 = storage_adapter.download_code_snapshot(s1.object_key)
-            c2 = storage_adapter.download_code_snapshot(s2.object_key)
+            try:
+                c1 = storage_adapter.download_code_snapshot(s1.object_key)
+                c2 = storage_adapter.download_code_snapshot(s2.object_key)
+            except StorageUnavailable:
+                # Evidence cannot be verified without the code (REQ-SIGNAL-003): no signal
+                return None
             change = _code_change_ratio(c1, c2)
             max_change = max(max_change, change)
             
@@ -373,9 +377,12 @@ def evaluate_loc_anomaly(session: CodingSession, db: Session) -> Optional[Attent
         
     # 4. Calculate cohort median LOC
     cohort_locs = []
-    for snap in cohort_snaps:
-        content = storage_adapter.download_code_snapshot(snap.object_key)
-        cohort_locs.append(_count_loc(content))
+    try:
+        for snap in cohort_snaps:
+            content = storage_adapter.download_code_snapshot(snap.object_key)
+            cohort_locs.append(_count_loc(content))
+    except StorageUnavailable:
+        return None
         
     cohort_locs.sort()
     n = len(cohort_locs)
@@ -395,7 +402,10 @@ def evaluate_loc_anomaly(session: CodingSession, db: Session) -> Optional[Attent
     if not my_snap:
         return None
         
-    my_content = storage_adapter.download_code_snapshot(my_snap.object_key)
+    try:
+        my_content = storage_adapter.download_code_snapshot(my_snap.object_key)
+    except StorageUnavailable:
+        return None
     student_loc = _count_loc(my_content)
     
     if median_loc <= 0:

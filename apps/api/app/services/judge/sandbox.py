@@ -15,6 +15,25 @@ class SandboxOutputLimitExceeded(Exception):
 class SandboxExecutionError(Exception):
     pass
 
+# Unprivileged identity of every sandbox container
+SANDBOX_UID = 1000
+SANDBOX_GID = 1000
+
+
+def prepare_workspace(path: str) -> None:
+    """
+    Hands a per-run workspace to the sandbox user. Needed when the worker runs as root
+    (containerised worker, docs/37 D3): mkdtemp creates 0700 root-owned dirs the sandbox
+    user could neither read nor write. No-op for a non-root worker.
+    """
+    geteuid = getattr(os, "geteuid", None)
+    if geteuid is None or geteuid() != 0:
+        return
+    for root, dirs, files in os.walk(path):
+        os.chown(root, SANDBOX_UID, SANDBOX_GID)
+        for name in files:
+            os.chown(os.path.join(root, name), SANDBOX_UID, SANDBOX_GID)
+
 class Sandbox:
     def __init__(self):
         try:
@@ -48,7 +67,7 @@ class Sandbox:
                 cpu_quota=settings.JUDGE_CPU_QUOTA,
                 cpu_period=100000,
                 pids_limit=settings.JUDGE_PIDS_LIMIT,
-                user="1000:1000",
+                user=f"{SANDBOX_UID}:{SANDBOX_GID}",
                 detach=True,
                 stdin_open=True if input_data else False
             )

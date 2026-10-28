@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pydantic import AnyHttpUrl
 
-from typing import List, Union
+from typing import List, Optional, Union
 
 
 
@@ -92,6 +92,18 @@ class Settings(BaseSettings):
     SIGNAL_SCHEDULER_BATCH_SIZE: int = 100
     # Phase 10B exam scheduler tick (docs/36 D10; REQ-EXAM-003 needs <= 60 s)
     EXAM_SCHEDULER_INTERVAL_SECONDS: int = 30
+
+    # Snapshot storage (docs/37 D1/D2): "memory" (per process, tests/dev) or "s3" (MinIO/S3)
+    STORAGE_BACKEND: str = "memory"
+    S3_ENDPOINT: str = "localhost:9000"
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_BUCKET: str = "spnc-snapshots"
+    S3_SECURE: bool = False
+    S3_REGION: Optional[str] = None
+    S3_CONNECT_TIMEOUT_SECONDS: float = 2.0
+    S3_READ_TIMEOUT_SECONDS: float = 10.0
+    S3_MAX_RETRIES: int = 2
 
     # Teacher notification WebSocket (docs/35 09C)
     WS_AUTH_TIMEOUT_SECONDS: float = 5.0

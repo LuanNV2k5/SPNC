@@ -3,7 +3,7 @@ import shutil
 import tempfile
 from typing import Dict, Any, Optional
 from app.core.config import settings
-from app.services.judge.sandbox import sandbox, SandboxTimeout, SandboxOutputLimitExceeded, SandboxExecutionError
+from app.services.judge.sandbox import sandbox, prepare_workspace, SandboxTimeout, SandboxOutputLimitExceeded, SandboxExecutionError
 from app.models.run_submit import RunVerdict
 
 class BaseAdapter:
@@ -38,6 +38,8 @@ class Python3Adapter(BaseAdapter):
                 if input_data:
                     f.write(input_data)
                 
+            prepare_workspace(temp_dir)
+
             # Command to execute
             command = "sh -c 'python3 main.py < input.txt'"
             
@@ -104,6 +106,8 @@ class Cpp17Adapter(BaseAdapter):
                 if input_data:
                     f.write(input_data)
                     
+            prepare_workspace(temp_dir)
+
             # Compile step
             compile_command = "g++ -std=c++17 -O2 main.cpp -o main"
             try:

@@ -1,7 +1,7 @@
 # 37 — SHARED SNAPSHOT STORAGE & COMPOSE STACK (PHASE 11) SPECIFICATION
 
 > **Module:** Object storage adapter, first-admin bootstrap, Docker Compose stack (Phase 11)
-> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTED AND VERIFIED 2026-10-29 (§7); lock tag pending Project Owner review
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase10` @ `460dcdc` (Phase 10 implemented, lock pending)
 > **Proposed Branch:** `phase11`
@@ -51,7 +51,7 @@ Phase 11 makes the existing architecture real. **No requirement, endpoint contra
 |---|---|---|
 | `postgres` | postgres:16-alpine | named volume |
 | `redis` | redis:7-alpine | |
-| `minio` | minio/minio | named volume; console port local only |
+| `minio-init` / `minio` | busybox chown, then MinIO (see §7.2) | named volume; console port local only |
 | `migrate` | `alembic upgrade head` | one-shot; app services wait for it |
 | `api` | `uvicorn app.main:app` | port 8000 |
 | `worker` | `python -m app.worker` | judge worker; Docker access per D3 |
@@ -104,4 +104,33 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before implementation.
 
 ## 7. Verification Record
 
-*To be completed at Phase 11 closure.*
+### 7.1 Changes (2026-10-29)
+| Area | Files |
+|---|---|
+| Storage | `app/services/storage.py` (memory / s3 backends, `StorageUnavailable`, `StorageConflict`, lazy bucket creation, bounded timeouts/retries), `app/core/config.py` (`STORAGE_BACKEND`, `S3_*`), `app/main.py` (503 `STORAGE_UNAVAILABLE`, 409 `SNAPSHOT_CONTENT_CONFLICT` handlers) |
+| Callers | `session_lifecycle.finalize_session` (outage → `final_loc = null`), `submission.judge_submission` and `worker.process_run` (outage → `FAILED_INTERNAL`), `judge/signals.py` (RF / LOC rules skip the signal when code cannot be read, REQ-SIGNAL-003) |
+| Sandbox | `judge/sandbox.prepare_workspace` + adapters: a root worker hands each per-run workspace to the sandbox uid (F5 companion; no-op for a non-root worker) |
+| Bootstrap | `app/services/bootstrap.py`, `app/cli.py` (`create-admin`, advisory-locked, AuditLog `ADMIN_BOOTSTRAPPED`) |
+| Stack | `apps/api/Dockerfile`, `apps/api/.dockerignore`, `docker-compose.yml`, `.env.example`, `docs/RUNBOOK.md` |
+| Dependencies | `minio`, `websockets` (+ `certifi`, `pycryptodome`, `urllib3`, `requests`). `requirements.txt` also lacked packages the app already needed: `email-validator`/`dnspython`, `python-multipart` (login form), `charset-normalizer`, plus `httpx`/`httpcore` for the test client and `pywin32` (Windows only). The container exposed this. |
+
+### 7.2 Notes and Deviations
+- **MinIO image:** MinIO no longer publishes community images on Docker Hub or quay.io (pull denied / 401 on 2026-10-29). The stack uses Chainguard's build of MinIO from source (`cgr.dev/chainguard/minio`, server `RELEASE.2026-10-23T20-06-51Z`, AGPLv3), pinned by digest. It is distroless and runs as uid 65532, so a one-shot `minio-init` (busybox) chowns the named volume and there is no container healthcheck; the app creates the bucket on first use and returns 503 until MinIO answers.
+- **Immutability check** reads the existing blob and compares its SHA-256 before refusing (409). Two concurrent uploads of *different* content to the same key are not atomically prevented (the S3 API used has no conditional put); with content-derived keys this needs an 8-hex-digit prefix collision within one session.
+- **Timeouts:** connect 2 s, read 10 s, 2 retries (`S3_CONNECT_TIMEOUT_SECONDS`, `S3_READ_TIMEOUT_SECONDS`, `S3_MAX_RETRIES`). With client defaults an outage held each call for about 36 s.
+- Bug found and fixed during testing: the CLI read the created user after its session closed (DetachedInstanceError on success).
+
+### 7.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| AC-11-01 `tests/infra/test_storage_s3.py` | Disposable MinIO (Chainguard image, non-root, tmpfs) | **6 passed** (round trip across two adapter instances, identical re-upload keeps ETag/mtime, foreign blob → `StorageConflict` and never overwritten, missing key, unreachable endpoint → `StorageUnavailable`, memory backend) |
+| AC-11-02, AC-11-04 `tests/api/test_storage_failures.py` | Disposable PostgreSQL 16.15, `spnc_phase10_submission_test` | **7 passed** (503 with no metadata row, session end → `final_loc` null, judge and Run → `FAILED_INTERNAL` without executing, bootstrap once + forced change + AuditLog, weak/missing password, taken username) |
+| AC-11-03, AC-11-05 `tests/e2e/test_compose_stack.py` | Full compose stack on Docker Desktop (Windows host) | **4 passed**, twice (re-runnable): Run executed by the `worker` container (stdout 42); submissions judged by the worker: ACCEPTED 100 and WRONG_ANSWER 50; `/api/v1/ws/teacher` authenticates under uvicorn. 3 snapshot blobs present in MinIO. |
+| Bootstrap in the stack | `docker compose exec api python -m app.cli create-admin` | first run exit 0, second run exit 1 |
+| AC-11-06 Phase 03–10 regression + Phase 11 API tests | Fresh per-phase DBs migrated to head; memory backend; Redis; Docker sandbox | **476 passed, 0 failed** |
+
+### 7.4 Known Limitations
+- Demo/dev only: Docker socket in the worker (D3, OQ-26). No TLS, reverse proxy or frontend.
+- Orphan blobs (upload succeeded, metadata insert failed) are not cleaned up yet (ADR-007 risk).
+- F6 (object key collisions for identical content in one session) remains.
+- The E2E test needs a running stack and is not part of the per-file regression script.

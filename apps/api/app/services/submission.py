@@ -25,7 +25,7 @@ from app.services.exam_access import assert_exam_open
 from app.services.judge.grader import grade
 from app.services.queue import judge_queue
 from app.services.session_lifecycle import finalize_session
-from app.services.storage import storage_adapter
+from app.services.storage import StorageUnavailable, storage_adapter
 from app.services.trace import _generate_fingerprint
 
 logger = logging.getLogger(__name__)
@@ -154,9 +154,13 @@ def judge_submission(db: Session, submission_id: uuid.UUID, adapters: Optional[M
         if not adapter:
             return _fail(db, submission_id, generation, f"Unsupported language: {snapshot.language}")
         # Never grade fabricated code: missing content is an internal failure, not empty source
-        if not storage_adapter.exists_code_snapshot(snapshot.object_key):
+        try:
+            available = storage_adapter.exists_code_snapshot(snapshot.object_key)
+            source_code = storage_adapter.download_code_snapshot(snapshot.object_key) if available else None
+        except StorageUnavailable:
+            available = False
+        if not available:
             return _fail(db, submission_id, generation, "Snapshot content unavailable")
-        source_code = storage_adapter.download_code_snapshot(snapshot.object_key)
 
         test_cases = submission_repo.load_test_cases(db, submission.problem_id)
         if not test_cases:

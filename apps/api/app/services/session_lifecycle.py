@@ -10,7 +10,7 @@ from app.models.trace import TraceEvent, TraceEventType
 from app.repositories import academic as academic_repo
 from app.repositories import trace as trace_repo
 from app.services.loc import count_loc
-from app.services.storage import storage_adapter
+from app.services.storage import StorageUnavailable, storage_adapter
 from app.services.trace import _generate_fingerprint
 
 
@@ -49,8 +49,12 @@ def finalize_session(
     # exists or its content is unavailable (never fabricate code facts)
     snapshot = trace_repo.get_latest_snapshot(db, session_id)
     final_loc = None
-    if snapshot and storage_adapter.exists_code_snapshot(snapshot.object_key):
-        final_loc = count_loc(storage_adapter.download_code_snapshot(snapshot.object_key))
+    try:
+        if snapshot and storage_adapter.exists_code_snapshot(snapshot.object_key):
+            final_loc = count_loc(storage_adapter.download_code_snapshot(snapshot.object_key))
+    except StorageUnavailable:
+        # Content unreachable: same as unavailable, never a fabricated LOC (docs/37 §4)
+        final_loc = None
 
     # D1: server wall clock (REQ-TRACE-006)
     ended_at = datetime.now(timezone.utc)
