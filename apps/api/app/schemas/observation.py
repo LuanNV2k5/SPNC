@@ -107,7 +107,7 @@ class ExamObservationItem(BaseModel):
     student_id: uuid.UUID
     username: str
     full_name: str
-    participation_status: str  # NOT_STARTED | IN_PROGRESS | COMPLETED | ABANDONED | EXPIRED | CANCELLED (D6)
+    participation_status: str  # NOT_STARTED | IN_PROGRESS | COMPLETED | EXPIRED | CANCELLED (docs/36 D8)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     submitted_problem_count: int

@@ -3,24 +3,26 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import String, Boolean, ForeignKey, Integer, UniqueConstraint, CheckConstraint, DateTime
+from sqlalchemy import String, Boolean, ForeignKey, Integer, UniqueConstraint, CheckConstraint, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.db.base import Base, TimestampMixin
 
+# Domain §1.5 (docs/36 D8)
 class ExamStatus(str, enum.Enum):
     DRAFT = "DRAFT"
     SCHEDULED = "SCHEDULED"
     ONGOING = "ONGOING"
-    COMPLETED = "COMPLETED"
+    ENDED = "ENDED"
     CANCELLED = "CANCELLED"
 
 class ParticipationStatus(str, enum.Enum):
     NOT_STARTED = "NOT_STARTED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
-    ABANDONED = "ABANDONED"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
 
 class Exam(Base, TimestampMixin):
     __tablename__ = "exams"
@@ -38,13 +40,21 @@ class Exam(Base, TimestampMixin):
     # Materialized status for quick query, but Authorization must use start_time/end_time
     status: Mapped[ExamStatus] = mapped_column(String(20), default=ExamStatus.DRAFT, index=True)
 
-    owner: Mapped["User"] = relationship("User")
+    # D14: students see exam results only after ENDED and when this is set
+    allow_view_result_after: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # REQ-EXAM-010 cancellation metadata
+    cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL", name="fk_exams_cancelled_by"), nullable=True)
+    cancel_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    owner: Mapped["User"] = relationship("User", foreign_keys=[owner_id])
     exam_problems: Mapped[List["ExamProblem"]] = relationship("ExamProblem", back_populates="exam", cascade="all, delete-orphan", order_by="ExamProblem.order_index")
     exam_assignments: Mapped[List["ExamAssignment"]] = relationship("ExamAssignment", back_populates="exam", cascade="all, delete-orphan")
     participations: Mapped[List["ExamParticipation"]] = relationship("ExamParticipation", back_populates="exam", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint('end_time > start_time', name='ck_exam_time_valid'),
+        CheckConstraint("status IN ('DRAFT', 'SCHEDULED', 'ONGOING', 'ENDED', 'CANCELLED')", name='status_valid'),
     )
 
 class ExamProblem(Base):
@@ -91,6 +101,7 @@ class ExamParticipation(Base, TimestampMixin):
 
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    expired_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     exam: Mapped["Exam"] = relationship("Exam", back_populates="participations")
     student: Mapped["User"] = relationship("User")
@@ -98,4 +109,5 @@ class ExamParticipation(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint('exam_id', 'student_id', name='uq_exam_participations_exam_student'),
         CheckConstraint('total_score >= 0', name='ck_exam_participations_score_positive'),
+        CheckConstraint("status IN ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED', 'CANCELLED')", name='status_valid'),
     )

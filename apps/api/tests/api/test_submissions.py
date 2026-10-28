@@ -180,6 +180,9 @@ def _exam_session(w, max_score=50, start_offset=-5, end_offset=60):
     assert client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=h_t).status_code in (200, 201)
     assert client.post(f"/api/v1/exams/{eid}/problems", json={"problem_id": w["pid"], "order_index": 1, "max_score": max_score},
                        headers=h_t).status_code in (200, 201)
+    with TestingSessionLocal() as s:   # docs/36 D11: published (past start, so not via the endpoint)
+        s.execute(text("UPDATE exams SET status = 'SCHEDULED' WHERE id = :id"), {"id": eid})
+        s.commit()
     r = client.post(f"/api/v1/my/exams/{eid}/start", headers=h_s)
     assert r.status_code in (200, 201), r.text
     part_id = r.json()["id"]
@@ -385,7 +388,7 @@ def test_exam_submission_scores_on_max_score_updates_best_total_and_hides_result
     db.expire_all()
     assert db.get(ExamParticipation, uuid.UUID(part_id)).total_score == 50
 
-    # D14: exam results stay hidden (allow_view_result_after arrives in 10B)
+    # D14: hidden while the exam is not ENDED (visibility after ENDED: test_exam_lifecycle.py)
     body = client.get(f"/api/v1/my/submissions/{second}", headers=w["h_s"]).json()
     assert body["status"] == "COMPLETED" and body["result_visible"] is False
     assert body["verdict"] is None and body["score"] is None and body["judge_result"] is None

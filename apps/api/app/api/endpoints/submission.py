@@ -19,4 +19,4 @@ router = APIRouter()
 def submit(req: SubmitRequest, session_id: uuid.UUID = Path(...), db: Session = Depends(get_db),
            current_user: User = Depends(require_student)):
     submission = svc.create_submission(db, current_user, session_id, req.snapshot_id)
-    return svc.to_student_response(submission)
+    return svc.to_student_response(db, submission)

@@ -162,6 +162,13 @@ def _past_exam_times(ended_minutes_ago: int = 30, duration_minutes: int = 60) ->
     return start, end
 
 
+def _publish(db, exam_id) -> None:
+    """Marks an exam SCHEDULED (published). Phase 05 fixtures use past start times, which the
+    publish endpoint (docs/36 10B) rejects, so the state is set directly."""
+    db.query(Exam).filter(Exam.id == exam_id).update({"status": "SCHEDULED"})
+    db.commit()
+
+
 def _active_exam_times(started_minutes_ago: int = 10, duration_minutes: int = 120) -> tuple:
     start = datetime.now(timezone.utc) - timedelta(minutes=started_minutes_ago)
     end = start + timedelta(minutes=duration_minutes)
@@ -709,6 +716,7 @@ class TestExamManagement:
             "end_time": end.isoformat(),
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         r = client.get("/api/v1/my/exams", headers=_auth(tok_s))
         assert r.status_code == 200
@@ -732,6 +740,7 @@ class TestExamManagement:
             "end_time": end.isoformat(),
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         r = client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
         assert r.status_code == 403
@@ -753,6 +762,7 @@ class TestExamManagement:
             "end_time": end.isoformat(),
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         r = client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
         assert r.status_code == 403
@@ -774,6 +784,7 @@ class TestExamManagement:
             "end_time": end.isoformat(),
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         r = client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
         assert r.status_code == 201
@@ -794,6 +805,7 @@ class TestExamManagement:
             "end_time": end.isoformat(),
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         r = client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
         assert r.status_code == 403
         assert r.json()["error_code"] == "EXAM_NOT_ASSIGNED"
@@ -838,6 +850,7 @@ class TestExamManagement:
             "end_time": end.isoformat(),
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         r1 = client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
         r2 = client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
@@ -920,6 +933,7 @@ class TestExamManagement:
             "title": "E20Exam", "start_time": start.isoformat(), "end_time": end.isoformat()
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         # Remove student
         client.delete(f"/api/v1/classes/{cid}/members/{s.id}", headers=_auth(tok_t))
@@ -944,6 +958,7 @@ class TestExamManagement:
             "title": "AtStartExam", "start_time": start.isoformat(), "end_time": end.isoformat()
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         r = client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
         assert r.status_code == 201
@@ -962,6 +977,7 @@ class TestExamManagement:
             "title": "E22Exam", "start_time": start.isoformat(), "end_time": end.isoformat()
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
         r = client.get(f"/api/v1/my/exams/{eid}/participation", headers=_auth(tok_s))
@@ -1038,7 +1054,7 @@ class TestExamManagement:
             title="EndedE25",
             start_time=start,
             end_time=end,
-            status="COMPLETED",
+            status="ENDED",  # docs/36 D8 (was COMPLETED)
         )
         db_session.add(e)
         db_session.commit()
@@ -1115,6 +1131,7 @@ class TestSessionManagement:
             "title": "S02Exam", "start_time": start.isoformat(), "end_time": end.isoformat()
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         # Start exam
         client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
@@ -1258,6 +1275,7 @@ class TestSessionManagement:
             "title": "S10Exam", "start_time": start.isoformat(), "end_time": end.isoformat()
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         client.post(f"/api/v1/exams/{eid}/problems",
                     json={"problem_id": pid, "order_index": 1, "max_score": 100},
@@ -1291,6 +1309,7 @@ class TestSessionManagement:
             "title": "S11Exam", "start_time": start.isoformat(), "end_time": end.isoformat()
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         # Do NOT attach problem to exam
         r_part = client.post(f"/api/v1/my/exams/{eid}/start", headers=_auth(tok_s))
@@ -1320,6 +1339,7 @@ class TestSessionManagement:
             "title": "S12Exam", "start_time": start.isoformat(), "end_time": end.isoformat()
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
         client.post(f"/api/v1/exams/{eid}/problems",
                     json={"problem_id": pid, "order_index": 1}, headers=_auth(tok_t))
@@ -1698,6 +1718,7 @@ class TestDatabaseInvariants:
             "end_time": end.isoformat(),
         }, headers=_auth(tok_t))
         eid = r_e.json()["id"]
+        _publish(db_session, eid)  # docs/36 D11: students only reach published exams
         client.post(f"/api/v1/exams/{eid}/classes", json={"class_id": cid}, headers=_auth(tok_t))
 
         barrier = threading.Barrier(4)

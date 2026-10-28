@@ -383,6 +383,9 @@ def test_exam_observation_overview(db, world):
     client.post(f"/api/v1/classes/{w['c1']}/members", json={"student_id": str(s_b.id)}, headers=w["h1"])
     now = datetime.now(timezone.utc)
     eid = _exam(w["h1"], "Midterm", [w["c1"]], [w["p1"]], now - timedelta(minutes=10), now + timedelta(minutes=110))
+    from app.models.exam import Exam
+    db.get(Exam, uuid.UUID(eid)).status = "SCHEDULED"   # docs/36 D11: published
+    db.commit()
 
     # end the practice sessions first: an active practice does not block, but keep the exam session the only ACTIVE one
     part_id = client.post(f"/api/v1/my/exams/{eid}/start", headers=w["hs"]).json()["id"]

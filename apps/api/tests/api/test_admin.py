@@ -335,7 +335,7 @@ def test_cancel_exam(admin_user, db_session):
 def test_cancel_completed_exam(admin_user, db_session):
     from app.models.exam import Exam, ExamStatus
     from datetime import datetime, timezone, timedelta
-    e = Exam(title="Final 3", owner_id=admin_user.id, start_time=datetime.now(timezone.utc), end_time=datetime.now(timezone.utc) + timedelta(hours=1), status=ExamStatus.COMPLETED)
+    e = Exam(title="Final 3", owner_id=admin_user.id, start_time=datetime.now(timezone.utc), end_time=datetime.now(timezone.utc) + timedelta(hours=1), status=ExamStatus.ENDED)
     db_session.add(e)
     db_session.commit()
     db_session.refresh(e)

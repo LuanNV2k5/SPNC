@@ -21,6 +21,7 @@ from app.models.user import User
 from app.repositories import academic as academic_repo
 from app.repositories import submission as submission_repo
 from app.repositories import trace as trace_repo
+from app.services.exam_access import assert_exam_open
 from app.services.judge.grader import grade
 from app.services.queue import judge_queue
 from app.services.session_lifecycle import finalize_session
@@ -50,19 +51,43 @@ def _value(v) -> str:
 # ---------------------------------------------------------------------------
 
 def _check_exam_window(db: Session, participation_id: uuid.UUID) -> uuid.UUID:
-    """DI-8 / REQ-EXAM-012: participation IN_PROGRESS, exam not cancelled, now in [start, end)."""
+    """DI-8 / REQ-EXAM-012: participation IN_PROGRESS and the exam open per D11."""
     participation = db.get(ExamParticipation, participation_id)
     if not participation or _value(participation.status) != ParticipationStatus.IN_PROGRESS.value:
         raise HTTPException(status_code=403, detail=_error("PARTICIPATION_NOT_ACTIVE", "Participation is not in progress"))
     exam = db.get(Exam, participation.exam_id)
-    if _value(exam.status) == ExamStatus.CANCELLED.value:
-        raise HTTPException(status_code=403, detail=_error("EXAM_CANCELLED", "Exam is cancelled"))
-    now = datetime.now(timezone.utc)
-    if now < exam.start_time:
-        raise HTTPException(status_code=403, detail=_error("EXAM_NOT_STARTED", "Exam has not started yet"))
-    if now >= exam.end_time:
-        raise HTTPException(status_code=403, detail=_error("EXAM_ENDED", "Exam has ended"))
+    assert_exam_open(exam, datetime.now(timezone.utc))
     return exam.id
+
+
+def record_submission(db: Session, session, snapshot: CodeSnapshot, exam_id: Optional[uuid.UUID],
+                      source: SubmissionSource) -> Submission:
+    """Creates the PENDING Submission and its server-authored SUBMISSION_CREATED event (REQ-TRACE-012).
+    The caller holds the session lock, finalizes the session afterwards and owns the commit."""
+    submission = submission_repo.create(db, Submission(
+        student_id=session.student_id,
+        problem_id=session.problem_id,
+        session_id=session.id,
+        snapshot_id=snapshot.id,
+        exam_id=exam_id,
+        source=source.value,
+        status=RunStatus.PENDING.value,
+    ))
+    # Same pattern as SESSION_ENDED (Phase 08E): sequence max + 1, server clock
+    now = datetime.now(timezone.utc)
+    payload = {"source": "SERVER", "submission_id": str(submission.id), "code_snapshot_id": str(snapshot.id)}
+    if source != SubmissionSource.STUDENT:
+        payload["submission_source"] = source.value
+    trace_repo.append_server_event(db, TraceEvent(
+        session_id=session.id,
+        sequence_number=trace_repo.get_max_sequence(db, session.id) + 1,
+        event_type=TraceEventType.SUBMISSION_CREATED.value,
+        canonical_fingerprint=_generate_fingerprint(TraceEventType.SUBMISSION_CREATED.value, payload),
+        client_timestamp=now,
+        server_timestamp=now,
+        payload=payload,
+    ))
+    return submission
 
 
 def create_submission(db: Session, student: User, session_id: uuid.UUID, snapshot_id: uuid.UUID) -> Submission:
@@ -86,28 +111,7 @@ def create_submission(db: Session, student: User, session_id: uuid.UUID, snapsho
     if submission_repo.count_test_cases(db, session.problem_id) == 0:
         raise HTTPException(status_code=422, detail=_error("PROBLEM_HAS_NO_TEST_CASES", "Problem has no test cases to judge against"))
 
-    submission = submission_repo.create(db, Submission(
-        student_id=student.id,
-        problem_id=session.problem_id,
-        session_id=session.id,
-        snapshot_id=snapshot.id,
-        exam_id=exam_id,
-        source=SubmissionSource.STUDENT.value,
-        status=RunStatus.PENDING.value,
-    ))
-
-    # REQ-TRACE-012: server-authored, same pattern as SESSION_ENDED (Phase 08E)
-    now = datetime.now(timezone.utc)
-    payload = {"source": "SERVER", "submission_id": str(submission.id), "code_snapshot_id": str(snapshot.id)}
-    trace_repo.append_server_event(db, TraceEvent(
-        session_id=session.id,
-        sequence_number=trace_repo.get_max_sequence(db, session.id) + 1,
-        event_type=TraceEventType.SUBMISSION_CREATED.value,
-        canonical_fingerprint=_generate_fingerprint(TraceEventType.SUBMISSION_CREATED.value, payload),
-        client_timestamp=now,
-        server_timestamp=now,
-        payload=payload,
-    ))
+    submission = record_submission(db, session, snapshot, exam_id, SubmissionSource.STUDENT)
 
     # D2: submit ends the session; a further attempt opens a new session
     finalize_session(db, session.id, SessionStatus.ENDED, TerminationSource.STUDENT)
@@ -225,15 +229,16 @@ def student_judge_result(judge_result: Optional[Dict[str, Any]]) -> Optional[Dic
     return view
 
 
-def result_visible_to_student(submission: Submission) -> bool:
-    """D14: practice always; exam only after ENDED + allow_view_result_after (column arrives in 10B)."""
+def result_visible_to_student(db: Session, submission: Submission) -> bool:
+    """D14: practice always; exam only after ENDED and with allow_view_result_after."""
     if submission.exam_id is None:
         return True
-    return False
+    exam = db.get(Exam, submission.exam_id)
+    return _value(exam.status) == ExamStatus.ENDED.value and bool(exam.allow_view_result_after)
 
 
-def to_student_response(submission: Submission) -> Dict[str, Any]:
-    visible = result_visible_to_student(submission)
+def to_student_response(db: Session, submission: Submission) -> Dict[str, Any]:
+    visible = result_visible_to_student(db, submission)
     return {
         "id": submission.id,
         "student_id": submission.student_id,

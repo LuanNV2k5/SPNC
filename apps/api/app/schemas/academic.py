@@ -152,6 +152,7 @@ class ExamCreateRequest(BaseModel):
     description: Optional[str] = None
     start_time: datetime
     end_time: datetime
+    allow_view_result_after: bool = False
 
     @field_validator("end_time")
     @classmethod
@@ -167,6 +168,13 @@ class ExamUpdateRequest(BaseModel):
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    allow_view_result_after: Optional[bool] = None
+
+
+class ExamCancelRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=1000)
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ExamResponse(BaseModel):
@@ -177,6 +185,9 @@ class ExamResponse(BaseModel):
     start_time: datetime
     end_time: datetime
     status: str
+    allow_view_result_after: bool = False
+    cancelled_at: Optional[datetime] = None
+    cancel_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -227,6 +238,7 @@ class ParticipationResponse(BaseModel):
     total_score: int
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
+    expired_at: Optional[datetime] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

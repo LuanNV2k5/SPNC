@@ -173,7 +173,8 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before implementation, 
 | Sub-phase | Commit | Files |
 |---|---|---|
 | 10A checkpoint | `a576fd0` | migration `b8e4f2a91d03` (submission columns, `submission.judged` NOTIFY), `Submission`/`SubmissionSource`, test case CRUD + samples (`app/services/testcase.py`, `app/api/endpoints/testcase.py`), `app/services/judge/grader.py`, per-problem memory limit in sandbox/adapters, `app/repositories/submission.py` (CAS fencing, D5 total). |
-| 10A | `feat(phase10a): submit and judge submissions` | `app/services/submission.py` (submit transaction, `judge_submission`, `recover_stale_submissions`, D7/D14 student view), `app/api/endpoints/submission.py` (`POST /my/coding-sessions/{id}/submissions`), `app/services/queue.py` (`enqueue_submission`), `app/worker.py` (dispatch by `kind`), `app/reconciler.py` (submission sweep), `SubmissionResponse` (+`exam_id`, `source`, `judge_result`, `result_visible`). |
+| 10A | `f0443e9` | `app/services/submission.py` (submit transaction, `judge_submission`, `recover_stale_submissions`, D7/D14 student view), `app/api/endpoints/submission.py` (`POST /my/coding-sessions/{id}/submissions`), `app/services/queue.py` (`enqueue_submission`), `app/worker.py` (dispatch by `kind`), `app/reconciler.py` (submission sweep), `SubmissionResponse` (+`exam_id`, `source`, `judge_result`, `result_visible`). |
+| 10B | `feat(phase10b): exam lifecycle and timeout finalization` | migration `c6e2a9d4b710` (exam visibility/cancel columns, `expired_at`, D8 value migration, status CHECKs, scheduler indexes), `app/services/exam_access.py` (D11), `app/services/exam_lifecycle.py` (publish, finalize, teacher/admin cancel, `run_tick`, timeout finalization), `app/api/endpoints/exam_lifecycle.py`, `app/exam_scheduler.py` (`EXAM_SCHEDULER_INTERVAL_SECONDS=30`), D11 in join/start-session/submit, D14 in `result_visible_to_student`, observation reads stored participation state, admin cancel via the service (D13). |
 
 ### 10.2 10A Behaviour Notes
 - **Submit transaction:** session `FOR UPDATE` → ownership / ACTIVE / snapshot-in-session → exam window (participation IN_PROGRESS, exam not CANCELLED, `start_time ≤ now < end_time`) → ≥1 test case (422 `PROBLEM_HAS_NO_TEST_CASES`) → `Submission` PENDING → `SUBMISSION_CREATED` (seq max+1, `{source:"SERVER", submission_id, code_snapshot_id}`) → `finalize_session(ENDED, STUDENT)` (D2; `SESSION_ENDED` follows at max+1) → one commit → enqueue. A lost enqueue is recovered by the reconciler.
@@ -194,7 +195,33 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before implementation, 
 | Phase 08E–09 (`test_session_lifecycle` 15, `test_observation` 17, `test_annotations` 18, `test_ws_notifications` 6) | Fresh per-phase DBs | **56 passed** |
 | **Total** | each file run on its own, fresh databases migrated to head | **446 passed, 0 failed** |
 
-### 10.4 Known Limitations (10A)
+### 10.4 10B Behaviour Notes
+- **Enums (D8):** `ExamStatus` DRAFT/SCHEDULED/ONGOING/ENDED/CANCELLED, `ParticipationStatus` NOT_STARTED/IN_PROGRESS/COMPLETED/EXPIRED/CANCELLED, both now enforced by CHECK constraints (`ck_exams_status_valid`, `ck_exam_participations_status_valid`). Migration up/down/up verified on an empty database.
+- **Publish** `POST /exams/{id}/publish` (owner): 409 `EXAM_NOT_DRAFT`; 422 `EXAM_START_IN_PAST`, `EXAM_NO_CLASS`, `EXAM_NO_PROBLEM`, `EXAM_PROBLEM_WITHOUT_TEST_CASES` (message lists the problem ids).
+- **Access (D11)**, shared by join, exam-session start and submit: DRAFT → 403 `EXAM_NOT_PUBLISHED`, CANCELLED → 403 `EXAM_CANCELLED`, before start → `EXAM_NOT_STARTED`, at/after end or ENDED → `EXAM_ENDED`. A SCHEDULED exam inside its window is open, so scheduler lag never blocks students. `GET /my/exams` no longer lists DRAFT exams.
+- **Finalize** `POST /my/exams/{id}/finalize`: IN_PROGRESS → COMPLETED (`completed_at`), ends the student's ACTIVE exam sessions as STUDENT, no auto-submit. 409 `PARTICIPATION_NOT_ACTIVE` when not IN_PROGRESS; 403 `EXAM_ENDED` at/after `end_time` (the timeout path owns it then).
+- **Teacher cancel** `POST /exams/{id}/cancel {reason}` (owner, reason 1–1000 chars): DRAFT/SCHEDULED only; ONGOING, or SCHEDULED past `start_time`, → 409 `EXAM_ONGOING`; ENDED → 400 `INVALID_STATE`; already cancelled → 409 `EXAM_ALREADY_CANCELLED`. Sets `cancelled_at/by/reason`, NOT_STARTED/IN_PROGRESS participations → CANCELLED, AuditLog `EXAM_CANCELLED` with `{reason}`; no submissions.
+- **Admin cancel (D13)** `PATCH /admin/exams/{id}/cancel`: same rule, ONGOING → 409 `EXAM_ONGOING_CANCEL_UNDECIDED`; still idempotent on CANCELLED and 400 on ENDED (Phase 04); AuditLog `EXAM_ADMIN_CANCELLED`.
+- **Scheduler tick (D10):** SCHEDULED → ONGOING at `start_time`; ONGOING → ENDED at `end_time`. Exams are row-locked (`SKIP LOCKED`) and re-checked. An exam whose whole window passed while the daemon was down goes through both steps in one tick.
+- **Timeout finalization:** one transaction per IN_PROGRESS participation. For each ACTIVE session: the latest snapshot with `created_at < end_time` that is newer than the session's last submitted snapshot is auto-submitted (`source=SYSTEM_EXAM_TIMEOUT`, `SUBMISSION_CREATED` payload adds `submission_source`), then the session ends as `SYSTEM_EXAM_TIMEOUT`, so `SESSION_ENDED` stays the last event. No such snapshot → no submission (D1). The participation becomes EXPIRED with `expired_at`; new submissions are enqueued after the commit. The exam becomes ENDED only when no IN_PROGRESS participation remains, so a crash mid-exam is finished by the next tick without duplicates.
+- **D14:** exam results are visible only when the exam is ENDED **and** `allow_view_result_after` is true (set on create or `PATCH /exams/{id}`). D7 filtering still applies.
+- **Observation:** a stored participation status is returned as is; the docs/35 D6 derivation (CANCELLED / EXPIRED) is kept only for assigned students who never joined.
+
+### 10.5 Earlier Tests Adjusted for 10B
+- `test_academic.py` (14 tests), `test_observation.py` (1), `test_submissions.py` (exam helper): exams are marked SCHEDULED before students join, because D11 forbids joining DRAFT. The fixtures use past start times, which the publish endpoint rejects, so the state is set directly.
+- `test_academic.py::test_P05_E25`, `test_admin.py::test_cancel_completed_exam`: `COMPLETED` exam status → `ENDED` (D8).
+
+### 10.6 Verification (10B)
+| Check | Environment | Result |
+|---|---|---|
+| Migration `c6e2a9d4b710` | Empty `spnc_10b_mig`, PostgreSQL 16.15 | up / down / up OK; CHECK names `ck_exams_status_valid`, `ck_exam_participations_status_valid` |
+| 10B `test_exam_lifecycle.py` | Disposable PostgreSQL 16.15, `spnc_phase10_submission_test` | **13 passed** |
+| 10B `test_exam_timeout.py` | same | **6 passed** |
+| 10A suites re-run (`test_grader` 12, `test_testcases` 7, `test_submissions` 13, `test_submission_fencing` 6) | same | **38 passed** |
+| Phase 03–09 regression (same files as §10.3) | Fresh per-phase DBs migrated to head; Redis; Docker sandbox | **408 passed** |
+| **Total** | each file run on its own | **465 passed, 0 failed** |
+
+### 10.7 Known Limitations (10A–10B)
 - Snapshot storage is per-process memory, so a separate worker process cannot read content uploaded by the API process; such submissions end `FAILED_INTERNAL`. Shared blob storage is still required before deployment (out of scope). Tests run the judge in-process.
 - `SUBMISSION_CREATED` is now server-authored, but trace ingest does not yet reserve it the way 08E reserves `SESSION_ENDED`; a client can still send an event of that type. Reserving it changes Phase 06/08 ingest behaviour and needs a decision.
-- Exam result visibility stays closed until 10B (D14).
+- Snapshot, run and trace ingest for an exam session are not cut off at `end_time` by this phase. The timeout path ignores snapshots received after `end_time` (invariant 2), and submit is refused, but a late snapshot can still be stored and becomes the session's `final_code_snapshot_id`.

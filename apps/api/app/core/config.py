@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     # Signal Scheduler
     SIGNAL_SCHEDULER_INTERVAL_SECONDS: int = 60
     SIGNAL_SCHEDULER_BATCH_SIZE: int = 100
+    # Phase 10B exam scheduler tick (docs/36 D10; REQ-EXAM-003 needs <= 60 s)
+    EXAM_SCHEDULER_INTERVAL_SECONDS: int = 30
 
     # Teacher notification WebSocket (docs/35 09C)
     WS_AUTH_TIMEOUT_SECONDS: float = 5.0

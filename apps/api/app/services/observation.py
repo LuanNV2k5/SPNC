@@ -132,15 +132,15 @@ def list_student_signals(
 
 
 def _derived_participation_status(exam, participation, now: datetime) -> str:
-    """D6: CANCELLED/EXPIRED are derived for display; no enum or state-machine change."""
+    """docs/36 10B: the stored participation state is authoritative (D8 enum). The docs/35 D6
+    derivation remains only for students who never joined, so they read CANCELLED/EXPIRED."""
+    if participation is not None:
+        return _value(participation.status)
     if _value(exam.status) == ExamStatus.CANCELLED.value:
-        return "CANCELLED"
-    raw = _value(participation.status) if participation else ParticipationStatus.NOT_STARTED.value
-    if raw == ParticipationStatus.COMPLETED.value:
-        return raw
+        return ParticipationStatus.CANCELLED.value
     if now >= exam.end_time:
-        return "EXPIRED"
-    return raw
+        return ParticipationStatus.EXPIRED.value
+    return ParticipationStatus.NOT_STARTED.value
 
 
 def get_exam_observation(db: Session, teacher: User, exam_id: uuid.UUID, skip: int, limit: int):

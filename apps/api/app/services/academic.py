@@ -224,6 +224,7 @@ def create_exam(db: Session, owner: User, req: ExamCreateRequest):
         description=req.description,
         start_time=req.start_time,
         end_time=req.end_time,
+        allow_view_result_after=req.allow_view_result_after,
     )
 
 def list_exams(db: Session, owner: User, skip: int, limit: int):
@@ -317,15 +318,9 @@ def start_exam_participation(db: Session, student: User, exam_id: uuid.UUID):
     if not e:
         raise HTTPException(status_code=404, detail=_error("EXAM_NOT_FOUND", "Exam not found"))
 
-    exam_status = e.status if isinstance(e.status, str) else e.status.value
-    if exam_status == "CANCELLED":
-        raise HTTPException(status_code=403, detail=_error("EXAM_CANCELLED", "Exam is cancelled"))
-
-    now = _now_utc()
-    if now < e.start_time:
-        raise HTTPException(status_code=403, detail=_error("EXAM_NOT_STARTED", "Exam has not started yet"))
-    if now >= e.end_time:
-        raise HTTPException(status_code=403, detail=_error("EXAM_ENDED", "Exam has already ended"))
+    # D11: published (SCHEDULED/ONGOING) and inside the authoritative time window
+    from app.services.exam_access import assert_exam_open
+    assert_exam_open(e, _now_utc())
 
     if not repo.student_assigned_to_exam(db, exam_id, student.id):
         raise HTTPException(status_code=403, detail=_error("EXAM_NOT_ASSIGNED", "You are not assigned to this exam"))
@@ -452,15 +447,8 @@ def start_exam_session(db: Session, student: User, participation_id: uuid.UUID, 
         raise HTTPException(status_code=403, detail=_error("PARTICIPATION_NOT_ACTIVE", "Participation is not in progress"))
 
     e = repo.get_exam_by_id(db, participation.exam_id)
-    exam_status = e.status if isinstance(e.status, str) else e.status.value
-    if exam_status == "CANCELLED":
-        raise HTTPException(status_code=403, detail=_error("EXAM_CANCELLED", "Exam is cancelled"))
-
-    now = _now_utc()
-    if now < e.start_time:
-        raise HTTPException(status_code=403, detail=_error("EXAM_NOT_STARTED", "Exam has not started yet"))
-    if now >= e.end_time:
-        raise HTTPException(status_code=403, detail=_error("EXAM_ENDED", "Exam has ended"))
+    from app.services.exam_access import assert_exam_open
+    assert_exam_open(e, _now_utc())
 
     ep = repo.get_exam_problem(db, e.id, req.problem_id)
     if not ep:
@@ -504,7 +492,7 @@ def end_exam_session(db: Session, student: User, session_id: uuid.UUID, req: End
 def list_submissions(db: Session, student: User, skip: int, limit: int):
     from app.services.submission import to_student_response
     items, total = repo.get_submissions_by_student(db, student.id, skip=skip, limit=limit)
-    return [to_student_response(s) for s in items], total
+    return [to_student_response(db, s) for s in items], total
 
 def get_submission(db: Session, student: User, submission_id: uuid.UUID):
     from app.services.submission import to_student_response
@@ -513,4 +501,4 @@ def get_submission(db: Session, student: User, submission_id: uuid.UUID):
         raise HTTPException(status_code=404, detail=_error("SUBMISSION_NOT_FOUND", "Submission not found"))
     if s.student_id != student.id:
         raise HTTPException(status_code=403, detail=_error("SUBMISSION_FORBIDDEN", "Not your submission"))
-    return to_student_response(s)
+    return to_student_response(db, s)

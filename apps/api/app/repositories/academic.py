@@ -221,6 +221,7 @@ def create_exam(
     description: Optional[str],
     start_time: datetime,
     end_time: datetime,
+    allow_view_result_after: bool = False,
 ) -> Exam:
     exam = Exam(
         owner_id=owner_id,
@@ -229,6 +230,7 @@ def create_exam(
         start_time=start_time,
         end_time=end_time,
         status=ExamStatus.DRAFT.value,
+        allow_view_result_after=allow_view_result_after,
     )
     db.add(exam)
     db.flush()
@@ -323,7 +325,8 @@ def get_exams_for_student(db: Session, student_id: uuid.UUID, skip: int = 0, lim
     ).distinct()
     q = db.query(Exam).filter(
         Exam.id.in_(exam_ids_q),
-        Exam.status != ExamStatus.CANCELLED.value,
+        # D11: drafts and cancelled exams are not offered to students
+        Exam.status.notin_([ExamStatus.CANCELLED.value, ExamStatus.DRAFT.value]),
         Exam.start_time <= now,  # only show started or ongoing
     )
     total = q.count()

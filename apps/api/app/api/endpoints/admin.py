@@ -13,6 +13,7 @@ from app.schemas.admin import (
 )
 from app.repositories import admin as admin_repo
 from app.services import admin as admin_service
+from app.services import exam_lifecycle
 from app.models.user import SystemSetting
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -70,16 +71,8 @@ def get_exam(exam_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.patch("/exams/{exam_id}/cancel")
 def cancel_exam(exam_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    e = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not e:
-        raise HTTPException(status_code=404, detail={"error_code": "EXAM_NOT_FOUND", "message": "Exam not found"})
-    if e.status == ExamStatus.CANCELLED:
-        return {"message": "Exam cancelled"}
-    if e.status == ExamStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail={"error_code": "INVALID_STATE", "message": "Cannot cancel completed exam"})
-
-    e.status = ExamStatus.CANCELLED
-    admin_service.log_admin_action(db, current_user.id, "EXAM_ADMIN_CANCELLED", "EXAM", str(exam_id))
+    # docs/36 D13: DRAFT/SCHEDULED only until OQ-23 is decided
+    exam_lifecycle.admin_cancel_exam(db, current_user, exam_id)
     db.commit()
     return {"message": "Exam cancelled"}
 
