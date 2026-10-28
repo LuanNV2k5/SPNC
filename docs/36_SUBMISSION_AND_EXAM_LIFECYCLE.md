@@ -1,7 +1,7 @@
 # 36 — SUBMISSION, JUDGING & EXAM LIFECYCLE (PHASE 10) SPECIFICATION
 
 > **Module:** Test Cases, Submission Judging, Exam Lifecycle & Results (Phase 10)
-> **Status:** APPROVED 2026-10-28 (all §9 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-28 (all §9 recommendations; see PROJECT_PROVENANCE_LOG.md) — 10A/10B/10C IMPLEMENTED AND VERIFIED 2026-10-28 (§10); lock tag pending Project Owner review
 > **Date:** 2026-10-28
 > **Parent Baseline:** `phase-09-observation-locked` (`e0b3315`)
 > **Proposed Branch:** `phase10`
@@ -174,7 +174,8 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before implementation, 
 |---|---|---|
 | 10A checkpoint | `a576fd0` | migration `b8e4f2a91d03` (submission columns, `submission.judged` NOTIFY), `Submission`/`SubmissionSource`, test case CRUD + samples (`app/services/testcase.py`, `app/api/endpoints/testcase.py`), `app/services/judge/grader.py`, per-problem memory limit in sandbox/adapters, `app/repositories/submission.py` (CAS fencing, D5 total). |
 | 10A | `f0443e9` | `app/services/submission.py` (submit transaction, `judge_submission`, `recover_stale_submissions`, D7/D14 student view), `app/api/endpoints/submission.py` (`POST /my/coding-sessions/{id}/submissions`), `app/services/queue.py` (`enqueue_submission`), `app/worker.py` (dispatch by `kind`), `app/reconciler.py` (submission sweep), `SubmissionResponse` (+`exam_id`, `source`, `judge_result`, `result_visible`). |
-| 10B | `feat(phase10b): exam lifecycle and timeout finalization` | migration `c6e2a9d4b710` (exam visibility/cancel columns, `expired_at`, D8 value migration, status CHECKs, scheduler indexes), `app/services/exam_access.py` (D11), `app/services/exam_lifecycle.py` (publish, finalize, teacher/admin cancel, `run_tick`, timeout finalization), `app/api/endpoints/exam_lifecycle.py`, `app/exam_scheduler.py` (`EXAM_SCHEDULER_INTERVAL_SECONDS=30`), D11 in join/start-session/submit, D14 in `result_visible_to_student`, observation reads stored participation state, admin cancel via the service (D13). |
+| 10B | `5963e17` | migration `c6e2a9d4b710` (exam visibility/cancel columns, `expired_at`, D8 value migration, status CHECKs, scheduler indexes), `app/services/exam_access.py` (D11), `app/services/exam_lifecycle.py` (publish, finalize, teacher/admin cancel, `run_tick`, timeout finalization), `app/api/endpoints/exam_lifecycle.py`, `app/exam_scheduler.py` (`EXAM_SCHEDULER_INTERVAL_SECONDS=30`), D11 in join/start-session/submit, D14 in `result_visible_to_student`, observation reads stored participation state, admin cancel via the service (D13). |
+| 10C | `feat(phase10c): class and exam statistics` | `app/services/statistics.py`, `app/repositories/statistics.py`, `app/schemas/statistics.py`, `app/api/endpoints/statistics.py` (`GET /classes/{id}/statistics`, `GET /exams/{id}/statistics`). |
 
 ### 10.2 10A Behaviour Notes
 - **Submit transaction:** session `FOR UPDATE` → ownership / ACTIVE / snapshot-in-session → exam window (participation IN_PROGRESS, exam not CANCELLED, `start_time ≤ now < end_time`) → ≥1 test case (422 `PROBLEM_HAS_NO_TEST_CASES`) → `Submission` PENDING → `SUBMISSION_CREATED` (seq max+1, `{source:"SERVER", submission_id, code_snapshot_id}`) → `finalize_session(ENDED, STUDENT)` (D2; `SESSION_ENDED` follows at max+1) → one commit → enqueue. A lost enqueue is recovered by the reconciler.
@@ -221,7 +222,28 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before implementation, 
 | Phase 03–09 regression (same files as §10.3) | Fresh per-phase DBs migrated to head; Redis; Docker sandbox | **408 passed** |
 | **Total** | each file run on its own | **465 passed, 0 failed** |
 
-### 10.7 Known Limitations (10A–10B)
+### 10.7 10C Behaviour Notes
+- **Access:** owner TEACHER only (class owner / exam owner); others 403 `FORBIDDEN_RESOURCE`, students 403, anonymous 401, unknown exam 404.
+- **Scope (docs/35 §3):** class: active members, and their sessions visible in the class (exam assigned to the class; practice problem published to it or owned by the teacher). Exam: active members of the teacher's classes assigned to the exam, exam sessions only.
+- **Definitions** (the spec leaves them open):
+  - *judged* submission = status COMPLETED; FAILED_INTERNAL and PENDING count in `total` only.
+  - `accepted_ratio` = ACCEPTED / judged (null when nothing is judged).
+  - Class score per student = mean over problems of the best judged percentage (`score / judge_result.score_base × 100`); null when nothing is judged. Unit `PERCENT`, max 100.
+  - Exam score per student = `ExamParticipation.total_score` (D5); null for students who never joined. Unit `POINTS`, `max_possible` = sum of `ExamProblem.max_score`.
+  - `average` = mean over students with a score. Distribution = 10 buckets of 10 % (class: the score; exam: percent of `max_possible`); 100 % falls in the last bucket.
+  - `average_working_time_seconds` = mean of `working_time_seconds` over in-scope sessions that have one (Phase 08E).
+  - Per student: `score`, `run_count`, `submission_count`, `session_count`, plus `student_id`, `username`, `full_name`. There are no labels or rankings.
+
+### 10.8 Verification (10C)
+| Check | Environment | Result |
+|---|---|---|
+| 10C `test_statistics.py` (hand-computed fixture: class average 77.5 %, buckets 50/90, ratio 0.5; exam average 20/40; §3 scope; owner-only) | Disposable PostgreSQL 16.15, `spnc_phase10_submission_test` | **4 passed** |
+| All Phase 10 suites (grader 12, test cases 7, submissions 13, submission fencing 6, exam lifecycle 13, exam timeout 6, statistics 4) | same | **61 passed** |
+| Phase 03–09 regression (same files as §10.3) | Fresh per-phase DBs migrated to head; Redis; Docker sandbox | **408 passed** |
+| **Total (AC-10-12)** | each file run on its own | **469 passed, 0 failed** |
+| AC-10-12 scope fence | static grep over Phase 10 services/schemas; UI file search | no points/ranking/judgment terms (only the docstring that rules them out); 0 UI files |
+
+### 10.9 Known Limitations (Phase 10)
 - Snapshot storage is per-process memory, so a separate worker process cannot read content uploaded by the API process; such submissions end `FAILED_INTERNAL`. Shared blob storage is still required before deployment (out of scope). Tests run the judge in-process.
 - `SUBMISSION_CREATED` is now server-authored, but trace ingest does not yet reserve it the way 08E reserves `SESSION_ENDED`; a client can still send an event of that type. Reserving it changes Phase 06/08 ingest behaviour and needs a decision.
 - Snapshot, run and trace ingest for an exam session are not cut off at `end_time` by this phase. The timeout path ignores snapshots received after `end_time` (invariant 2), and submit is refused, but a late snapshot can still be stored and becomes the session's `final_code_snapshot_id`.
