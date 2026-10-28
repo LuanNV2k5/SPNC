@@ -1,7 +1,7 @@
 # 35 — TEACHER OBSERVATION (PHASE 09) SPECIFICATION
 
 > **Module:** Teacher Observation, Annotations & Realtime Notification (Phase 09)
-> **Status:** APPROVED 2026-10-28 (all §9 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-28 (all §9 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTED, PENDING LOCK
 > **Date:** 2026-10-28
 > **Parent Baseline:** `phase-08e-session-hardening-locked` (`d2ddfee`)
 > **Proposed Branch:** `phase09`
@@ -179,4 +179,30 @@ Approval (all recommendations or with overrides) is recorded in `docs/PROJECT_PR
 
 ## 10. Verification Record
 
-*To be completed at Phase 09 closure.*
+### 10.1 Changes (2026-10-28)
+| Sub-phase | Commit | Files |
+|---|---|---|
+| 09A | `8f21de9` | `app/services/observation_auth.py` (§3 rule), `app/services/observation.py`, `app/repositories/observation.py`, `app/schemas/observation.py`, `app/api/endpoints/observation.py`. `app/services/trace.py` (teacher endpoints → §3) and `app/services/run.py` (owner-only run reads, F1). |
+| 09B | `04252ae` | `app/services/annotation.py`, `app/repositories/annotation.py`, `app/api/endpoints/annotation.py`, `SignalStatus` aligned (D1), `TeacherAnnotation.deleted_at` (D7), migration `f7b2d4e61c38`. |
+| 09C | (this commit) | `app/realtime/hub.py` (LISTEN thread + per-subscriber §3 filtering), `app/api/endpoints/ws.py` (`/api/v1/ws/teacher`, first-message auth, 4401/4403 closes), `deps.resolve_user_from_token`, `WS_AUTH_TIMEOUT_SECONDS`, migration `a3c9e7d15f42` (NOTIFY triggers on signals, runs, sessions). |
+
+### 10.2 Behaviour Changes to Earlier Phases
+- **Phase 06 teacher trace/scratchpad endpoints:** sessions outside the §3 rule now return 404 (they used to be visible to the class owner).
+- **Phase 07 run reads (`/my/coding-sessions/{id}/runs*`):** owner STUDENT only. Teachers use `/classes/{c}/students/{s}/sessions/{id}/runs`.
+- **`SignalStatus`:** values `VIEWED`/`ACK` were removed; they were never written before Phase 09.
+
+### 10.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| Migrations `f7b2d4e61c38`, `a3c9e7d15f42` | Fresh `spnc_phase09_fresh`, PostgreSQL 16.15 | up / down / up OK; 3 NOTIFY triggers present at head, removed on downgrade |
+| 09A `test_observation.py` | Disposable PostgreSQL 16, `spnc_phase09_observation_test` | **17 passed** |
+| 09B `test_annotations.py` | same | **18 passed** |
+| 09C `test_ws_notifications.py` | same | **6 passed** |
+| Phase 08 suite | `spnc_phase09_fresh` | **90 passed** |
+| Phase 03–08E regression | Disposable PostgreSQL 16 per phase DB; Redis; Docker sandbox | **277 passed** |
+| AC-09-12 scope fence / ethics grep | static | 0 student routes, 0 UI files, 0 judgmental terms |
+
+### 10.4 Known Limitations
+- **WebSocket serving dependency:** uvicorn needs a WebSocket library (`websockets` or `wsproto`) to serve `/api/v1/ws/teacher`. Neither is in `requirements.txt` or the venv. Tests use Starlette's TestClient, which does not need one.
+- Notifications are best-effort per API process: each process runs its own listener. Clients must REST-resync after reconnect (NFR-REALTIME-003).
+- REQ-OBS-007 (statistics) deferred (D5). ADMIN observation endpoints deferred (D9). Shared blob storage is still needed before deployment.

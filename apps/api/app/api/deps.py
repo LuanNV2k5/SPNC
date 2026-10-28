@@ -26,13 +26,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login
 
 
 
-def get_current_user(
-
-    db: Session = Depends(get_db),
-
-    token: str = Depends(oauth2_scheme)
-
-) -> User:
+def resolve_user_from_token(db: Session, token: str) -> User:
+    """Validates an access token and returns its active user; raises HTTPException (401/403) otherwise.
+    Shared by HTTP auth (get_current_user) and WebSocket auth (Phase 09C)."""
 
     credentials_exception = HTTPException(
 
@@ -102,6 +98,12 @@ def get_current_user(
 
     return user
 
+
+def get_current_user(
+    db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme)
+) -> User:
+    return resolve_user_from_token(db, token)
 
 
 def require_active_user(current_user: User = Depends(get_current_user)) -> User:
