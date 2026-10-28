@@ -83,9 +83,11 @@ class AdminDashboardSummaryResponse(BaseModel):
     recent_audit_count: int
 
 class AdminSettingsPatchRequest(BaseModel):
-    retention_days: int
+    retention_days: Optional[int] = None
+    idle_threshold_minutes: Optional[int] = None   # REQ-USER-007: 1-60, applies to new sessions
 
 class AdminSettingsResponse(BaseModel):
     retention_days: int
+    idle_threshold_minutes: int
 
 AdminUserListResponse.model_rebuild()

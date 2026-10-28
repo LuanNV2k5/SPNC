@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.repositories import academic as repo
+from app.services import system_settings
 from app.services.problem_guard import assert_not_deleted, assert_problem_mutable
 from app.schemas.academic import (
     ClassCreateRequest, ClassUpdateRequest,
@@ -462,6 +463,7 @@ def start_practice_session(db: Session, student: User, req: StartPracticeSession
         problem_id=req.problem_id,
         language=req.language,
         practice_attempt_id=attempt.id,
+        idle_threshold_seconds=system_settings.idle_threshold_seconds(db),   # docs/39 D3
     )
 
 def list_practice_sessions(db: Session, student: User, skip: int, limit: int):
@@ -536,6 +538,7 @@ def start_exam_session(db: Session, student: User, participation_id: uuid.UUID, 
         problem_id=req.problem_id,
         language=req.language,
         exam_participation_id=participation_id,
+        idle_threshold_seconds=system_settings.idle_threshold_seconds(db),   # docs/39 D3
     )
 
 def get_exam_session(db: Session, student: User, session_id: uuid.UUID):

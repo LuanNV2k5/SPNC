@@ -24,6 +24,11 @@ MEANINGFUL_EVENT_TYPES = {
     TraceEventType.SUBMISSION_CREATED,
 }
 
+
+def _idle_threshold(session) -> int:
+    """REQ-USER-007: the threshold captured when the session opened; older sessions use the deployment default."""
+    return getattr(session, "idle_threshold_seconds", None) or settings.SIGNAL_IDLE_THRESHOLD_SECONDS
+
 def _get_stable_time(dt: datetime) -> int:
     return int(dt.timestamp())
 
@@ -51,8 +56,8 @@ def evaluate_idle_detected(session: CodingSession, db: Session, evaluated_at: Op
     last_meaningful_at = latest_event.server_timestamp if latest_event else session.opened_at
     idle_seconds = (evaluated_at - last_meaningful_at).total_seconds()
     
-    if idle_seconds >= settings.SIGNAL_IDLE_THRESHOLD_SECONDS:
-        window = int(idle_seconds // settings.SIGNAL_IDLE_THRESHOLD_SECONDS)
+    if idle_seconds >= _idle_threshold(session):
+        window = int(idle_seconds // _idle_threshold(session))
         dedup_key = f"IDLE:{session.id}:{_get_stable_time(last_meaningful_at)}:W{window}"
         
         evidence = {
@@ -60,14 +65,14 @@ def evaluate_idle_detected(session: CodingSession, db: Session, evaluated_at: Op
             "last_meaningful_event_at": last_meaningful_at.isoformat(),
             "evaluated_at": evaluated_at.isoformat(),
             "idle_duration_seconds": idle_seconds,
-            "threshold_seconds": settings.SIGNAL_IDLE_THRESHOLD_SECONDS,
+            "threshold_seconds": _idle_threshold(session),
             "last_meaningful_event_type": getattr(latest_event.event_type, "value", latest_event.event_type) if latest_event else "SESSION_OPENED",
             # Authoritative REQ-IDLE-002 & docs/01_DOMAIN.md §1.8 fields
             "start_time": last_meaningful_at.isoformat(),
             "end_time": evaluated_at.isoformat(),
             "duration_seconds": idle_seconds,
             "meaningful_event_before_id": str(latest_event.id) if latest_event else None,
-            "threshold_used": settings.SIGNAL_IDLE_THRESHOLD_SECONDS,
+            "threshold_used": _idle_threshold(session),
         }
         
         return AttentionSignal(
@@ -130,7 +135,7 @@ def evaluate_historical_idle_gaps(session: CodingSession, target_events: List[An
         if gap_seconds <= 0:
             continue
 
-        if gap_seconds >= settings.SIGNAL_IDLE_THRESHOLD_SECONDS:
+        if gap_seconds >= _idle_threshold(session):
             window = 1
             dedup_key = f"IDLE:{session.id}:{_get_stable_time(start_time)}:W{window}"
 
@@ -140,12 +145,12 @@ def evaluate_historical_idle_gaps(session: CodingSession, target_events: List[An
                 "end_time": event_ts.isoformat(),
                 "duration_seconds": gap_seconds,
                 "meaningful_event_before_id": prev_id,
-                "threshold_used": settings.SIGNAL_IDLE_THRESHOLD_SECONDS,
+                "threshold_used": _idle_threshold(session),
                 # Canonical & legacy compatibility fields
                 "last_meaningful_event_at": start_time.isoformat(),
                 "evaluated_at": event_ts.isoformat(),
                 "idle_duration_seconds": gap_seconds,
-                "threshold_seconds": settings.SIGNAL_IDLE_THRESHOLD_SECONDS,
+                "threshold_seconds": _idle_threshold(session),
                 "last_meaningful_event_type": prev_type,
                 "gap_closed": True,
                 "closing_event_id": str(event_id) if event_id else None,

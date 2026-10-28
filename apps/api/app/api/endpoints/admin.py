@@ -13,7 +13,7 @@ from app.schemas.admin import (
 )
 from app.repositories import admin as admin_repo
 from app.services import admin as admin_service
-from app.services import exam_lifecycle
+from app.services import exam_lifecycle, system_settings
 from app.models.user import SystemSetting
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -88,19 +88,10 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
 
 @router.get("/settings", response_model=AdminSettingsResponse)
 def get_settings(db: Session = Depends(get_db)):
-    s = db.query(SystemSetting).filter(SystemSetting.key == "retention_days").first()
-    return {"retention_days": s.value.get("days", 30) if s else 30}
+    return system_settings.read_settings(db)
 
 @router.patch("/settings")
 def update_settings(req: AdminSettingsPatchRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if req.retention_days < 1 or req.retention_days > 3650:
-        raise HTTPException(status_code=422, detail={"error_code": "INVALID_SETTING", "message": "Invalid retention days"})
-    s = db.query(SystemSetting).filter(SystemSetting.key == "retention_days").first()
-    if not s:
-        s = SystemSetting(key="retention_days", value={"days": req.retention_days})
-        db.add(s)
-    else:
-        s.value = {"days": req.retention_days}
-    admin_service.log_admin_action(db, current_user.id, "SYSTEM_SETTING_CHANGED", "SETTING", "retention_days")
+    result = system_settings.update_settings(db, current_user, req.retention_days, req.idle_threshold_minutes)
     db.commit()
-    return {"message": "success"}
+    return {"message": "success", **result}

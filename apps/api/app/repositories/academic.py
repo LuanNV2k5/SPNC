@@ -401,6 +401,7 @@ def create_practice_session(
     problem_id: uuid.UUID,
     language: str,
     practice_attempt_id: uuid.UUID,
+    idle_threshold_seconds: Optional[int] = None,
 ) -> CodingSession:
     s = CodingSession(
         student_id=student_id,
@@ -409,6 +410,7 @@ def create_practice_session(
         is_exam_context=False,
         practice_attempt_id=practice_attempt_id,
         status=SessionStatus.ACTIVE.value,
+        idle_threshold_seconds=idle_threshold_seconds,
     )
     db.add(s)
     db.flush()
@@ -421,6 +423,7 @@ def create_exam_session(
     problem_id: uuid.UUID,
     language: str,
     exam_participation_id: uuid.UUID,
+    idle_threshold_seconds: Optional[int] = None,
 ) -> CodingSession:
     s = CodingSession(
         student_id=student_id,
@@ -429,6 +432,7 @@ def create_exam_session(
         is_exam_context=True,
         exam_participation_id=exam_participation_id,
         status=SessionStatus.ACTIVE.value,
+        idle_threshold_seconds=idle_threshold_seconds,
     )
     db.add(s)
     db.flush()

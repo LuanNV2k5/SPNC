@@ -42,6 +42,8 @@ class CodingSession(Base, TimestampMixin):
     # Termination facts computed server-side at finalization (REQ-SIGNAL-001, REQ-TRACE-015)
     final_loc: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     working_time_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # REQ-USER-007, docs/39 D3: idle threshold in force when the session opened (NULL = deployment default)
+    idle_threshold_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     final_code_snapshot_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("code_snapshots.id", ondelete="RESTRICT", name="fk_coding_sessions_final_code_snapshot_id", use_alter=True), nullable=True)
 
     student: Mapped["User"] = relationship("User")
