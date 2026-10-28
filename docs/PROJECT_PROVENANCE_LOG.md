@@ -232,3 +232,51 @@ Approved Decisions:
 - D7 `LOC_ANOMALY` created after finalization carries `final_loc = session.final_loc`; `rule_version` → `"1.1.0"`. Stored evidence is not mutated.
 - D8 REQ-SESSION-003/004 excluded from 08E (requires Submission pipeline).
 - D9 No backfill for sessions ended before 08E.
+
+---
+
+## Decision: Phase 09 Teacher Observation Specification Approval
+
+Date:
+2026-10-28
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-28): "Duyệt theo khuyến nghị". All recommendations in `docs/35_TEACHER_OBSERVATION.md` §9 are approved without overrides.
+
+Approved Decisions:
+- D1 `SignalStatus` = `NEW | ACKNOWLEDGED | DISMISSED` (domain §1.8). TEACHER OWN_CLASS may move NEW → ACKNOWLEDGED/DISMISSED and back to NEW. See DCR SPNC_SIGNAL_STATUS_TRANSITIONS below.
+- D2 Session visibility in class context (docs/35 §3): exam assigned to the class, or practice problem published to the class / owned by the teacher. Applies to the Phase 06 teacher trace/scratchpad endpoints and teacher run reads.
+- D3 Timeline order = `sequence_number` (causal client order), with `server_timestamp` on every event. This is the approved interpretation of REQ-OBS-003 "theo server_timestamp".
+- D4 Cross-process WebSocket notifications via PostgreSQL `LISTEN/NOTIFY` triggers (id-only payloads).
+- D5 REQ-OBS-007 statistics deferred until the Submission pipeline exists.
+- D6 `EXPIRED` / `CANCELLED` participation states derived in responses; no enum change.
+- D7 TeacherAnnotation soft delete (`deleted_at`).
+- D8 Annotation content: plain text, 1–5000 characters.
+- D9 ADMIN observation endpoints deferred to a later admin phase.
+
+---
+
+## Decision: DCR SPNC_SIGNAL_STATUS_TRANSITIONS
+
+Date:
+2026-10-28
+
+Status:
+APPROVED_RBAC_AMENDMENT
+
+Approval Source:
+Project Owner explicit authorization (2026-10-28), docs/35 D1.
+
+Scope:
+- `docs/05_RBAC_MATRIX.md` Resource AttentionSignal (Revision 0.4)
+- `apps/api/app/models/observation.py` `SignalStatus`
+
+Change:
+- Old: the RBAC matrix lists only ACKNOWLEDGE (TEACHER OWN_CLASS). Code enum is `NEW / VIEWED / ACK / DISMISSED`.
+- New: the code enum matches domain §1.8, `NEW / ACKNOWLEDGED / DISMISSED`. TEACHER OWN_CLASS may also DISMISS or reopen to NEW. Every change writes an AuditLog entry. Evidence stays immutable (DTI-08).
+
+Compatibility:
+- `attention_signals.status` is `String(20)`. Before Phase 09 only `NEW` was ever written, so no stored rows change.

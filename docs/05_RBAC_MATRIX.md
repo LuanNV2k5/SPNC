@@ -201,6 +201,7 @@
 | CREATE | DENY | DENY | DENY | Only internal SYSTEM (Signal Engine) creates; UC-E03 |
 | READ | SYSTEM_WIDE | OWN_CLASS | DENY | TEACHER reads signals for own class students; DTI-12; REQ-STU-003 |
 | ACKNOWLEDGE (status → ACKNOWLEDGED) | DENY | OWN_CLASS | DENY | TEACHER acknowledges signal; UC-F01 |
+| DISMISS (status → DISMISSED) / REOPEN (→ NEW) | DENY | OWN_CLASS | DENY | DCR SPNC_SIGNAL_STATUS_TRANSITIONS (2026-10-28); docs/35 D1; status only, evidence unchanged |
 | UPDATE (evidence) | DENY | DENY | DENY | Signal evidence is immutable; DTI-08 |
 | DELETE | DENY | DENY | DENY | Signal records preserved |
 
@@ -260,3 +261,4 @@
 |---------|------|----------|
 | 0.2 | 2026-09-19 | Tạo mới — fix Mi-08; B17 |
 | 0.3 | 2026-09-19 | Final Phase 00 Baseline |
+| 0.4 | 2026-10-28 | DCR SPNC_SIGNAL_STATUS_TRANSITIONS: TEACHER OWN_CLASS may DISMISS a signal or reopen it to NEW (docs/35 D1) |
