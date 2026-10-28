@@ -153,7 +153,8 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` with DCRs for D4 (Phase
 | 12C `test_phase12c_trace.py` | same | **3 passed** |
 | Phase 03–11 suites (incl. MinIO adapter on a disposable MinIO) | Fresh per-phase DBs migrated to head; Redis; Docker sandbox | **482 passed** |
 | **Total (AC-12-10)** | each file run on its own | **499 passed, 0 failed** |
+| Demo compose stack rebuilt from `phase12` on its existing volumes | Docker Desktop (Windows host) | `migrate` applied `d7f3b1c2e845`, `e8a4c2d5f901` to the demo DB; `tests/e2e/test_compose_stack.py` **4 passed**; live check: class shows `invite_code`, student joins with the lower-case code (201), `/my/classes` hides the code, `difficulty=EASY` filter, problem delete → 204 and hidden from the bank |
 
 ### 8.5 Known Limitations
-- The demo compose stack still runs Phase 11 code; Phase 12 was not rebuilt into it (kept running for the demo at the owner's request). The two new migrations were verified up/down/up on an empty database instead.
+- The two new migrations were also verified up/down/up on an empty database.
 - REQ-USER-007, REQ-TRACE-013 (SHOULD) and REQ-STU-004 (OQ-16) remain out of scope. OQ-27 records the `duration_minutes` assumption.
