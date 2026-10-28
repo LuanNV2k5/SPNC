@@ -16,9 +16,9 @@ class SignalType(str, enum.Enum):
     LOC_ANOMALY = "LOC_ANOMALY"
 
 class SignalStatus(str, enum.Enum):
+    # Domain §1.8 / DCR SPNC_SIGNAL_STATUS_TRANSITIONS (docs/35 D1)
     NEW = "NEW"
-    VIEWED = "VIEWED"
-    ACK = "ACK"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
     DISMISSED = "DISMISSED"
 
 class AttentionSignal(Base):
@@ -50,6 +50,8 @@ class TeacherAnnotation(Base, TimestampMixin):
     signal_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("attention_signals.id", ondelete="SET NULL"), nullable=True, index=True)
 
     content: Mapped[str] = mapped_column(String)
+    # docs/35 D7: soft delete; rows with deleted_at are excluded from every read
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     teacher: Mapped["User"] = relationship("User", foreign_keys=[teacher_id])
     student: Mapped["User"] = relationship("User", foreign_keys=[student_id])

@@ -3,8 +3,9 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.models.observation import SignalStatus
 from app.schemas.academic import PaginatedResponse
 from app.schemas.run import RunResponse
 from app.schemas.trace import TraceEventResponse, TraceStateResponse
@@ -119,3 +120,61 @@ class ExamObservationResponse(PaginatedResponse):
     exam_title: str
     exam_status: str
     items: List[ExamObservationItem]
+
+
+# ---------------------------------------------------------------------------
+# Phase 09B — signal status & annotations
+# ---------------------------------------------------------------------------
+class SignalStatusUpdate(BaseModel):
+    # Only the status can change; any other field (e.g. evidence) is rejected (DTI-08)
+    model_config = ConfigDict(extra="forbid")
+    status: SignalStatus
+
+
+def _validate_content(v: str) -> str:
+    # D8: plain text, 1-5000 characters, not blank
+    if not v or not v.strip():
+        raise ValueError("content must not be blank")
+    if len(v) > 5000:
+        raise ValueError("content must be at most 5000 characters")
+    return v
+
+
+class AnnotationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    student_id: uuid.UUID
+    session_id: Optional[uuid.UUID] = None
+    signal_id: Optional[uuid.UUID] = None
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def _check_content(cls, v: str) -> str:
+        return _validate_content(v)
+
+
+class AnnotationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def _check_content(cls, v: str) -> str:
+        return _validate_content(v)
+
+
+class AnnotationResponse(BaseModel):
+    id: uuid.UUID
+    teacher_id: uuid.UUID
+    student_id: uuid.UUID
+    session_id: Optional[uuid.UUID] = None
+    signal_id: Optional[uuid.UUID] = None
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AnnotationListResponse(PaginatedResponse):
+    items: List[AnnotationResponse]
