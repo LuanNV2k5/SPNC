@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, ForeignKey, Integer, CheckConstraint, DateTime
+from sqlalchemy import String, ForeignKey, Integer, CheckConstraint, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
@@ -24,6 +24,10 @@ class RunVerdict(str, enum.Enum):
     MEMORY_LIMIT_EXCEEDED = "MEMORY_LIMIT_EXCEEDED"
     OUTPUT_LIMIT_EXCEEDED = "OUTPUT_LIMIT_EXCEEDED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+
+class SubmissionSource(str, enum.Enum):
+    STUDENT = "STUDENT"
+    SYSTEM_EXAM_TIMEOUT = "SYSTEM_EXAM_TIMEOUT"
 
 class Run(Base, TimestampMixin):
     __tablename__ = "runs"
@@ -59,10 +63,18 @@ class Submission(Base, TimestampMixin):
     problem_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("problems.id", ondelete="RESTRICT"), index=True)
     session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("coding_sessions.id", ondelete="RESTRICT"), index=True)
     snapshot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("code_snapshots.id", ondelete="RESTRICT"), index=True)
+    exam_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("exams.id", ondelete="RESTRICT", name="fk_submissions_exam_id"), nullable=True)
+    source: Mapped[SubmissionSource] = mapped_column(String(30), default=SubmissionSource.STUDENT, server_default="STUDENT")
 
-    status: Mapped[RunStatus] = mapped_column(String(20), default=RunStatus.PENDING)
+    status: Mapped[RunStatus] = mapped_column(String(20), default=RunStatus.PENDING, index=True)
     verdict: Mapped[Optional[RunVerdict]] = mapped_column(String(30), nullable=True)
     score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Per-testcase results (docs/36 §3); hidden-case I/O is never stored
+    judge_result: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Same fencing as Run (Phase 07): stale generations cannot write results
+    execution_generation: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    lease_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     student: Mapped["User"] = relationship("User")
     problem: Mapped["Problem"] = relationship("Problem")
@@ -71,4 +83,7 @@ class Submission(Base, TimestampMixin):
 
     __table_args__ = (
         CheckConstraint('score >= 0', name='ck_submissions_score_positive'),
+        CheckConstraint("source IN ('STUDENT', 'SYSTEM_EXAM_TIMEOUT')", name='ck_submissions_source_valid'),
+        CheckConstraint('execution_generation >= 0', name='ck_submissions_generation_non_negative'),
+        Index('ix_submissions_exam_student_problem', 'exam_id', 'student_id', 'problem_id'),
     )

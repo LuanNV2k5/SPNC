@@ -99,7 +99,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 
-from app.api.endpoints import auth, admin, academic, trace, run, observation, annotation, ws
+from app.api.endpoints import auth, admin, academic, trace, run, observation, annotation, ws, testcase
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
@@ -109,3 +109,4 @@ app.include_router(run.router, prefix=f"{settings.API_V1_STR}/my/coding-sessions
 app.include_router(observation.router, prefix=f"{settings.API_V1_STR}", tags=["observation"])
 app.include_router(annotation.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(ws.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(testcase.router, prefix=f"{settings.API_V1_STR}", tags=["test-cases"])

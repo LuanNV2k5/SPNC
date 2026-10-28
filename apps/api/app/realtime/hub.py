@@ -32,6 +32,7 @@ ALLOWED_KEYS = {
     "signal.created": ("signal_id", "session_id", "student_id", "signal_type"),
     "run.completed": ("run_id", "session_id", "student_id", "verdict", "status"),
     "session.state": ("session_id", "student_id", "status"),
+    "submission.judged": ("submission_id", "session_id", "student_id", "verdict"),
 }
 
 

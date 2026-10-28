@@ -7,11 +7,11 @@ from app.services.judge.sandbox import sandbox, SandboxTimeout, SandboxOutputLim
 from app.models.run_submit import RunVerdict
 
 class BaseAdapter:
-    def execute(self, source_code: str, input_data: Optional[str]) -> Dict[str, Any]:
+    def execute(self, source_code: str, input_data: Optional[str], memory_limit_mb: Optional[int] = None) -> Dict[str, Any]:
         raise NotImplementedError()
 
 class Python3Adapter(BaseAdapter):
-    def execute(self, source_code: str, input_data: Optional[str]) -> Dict[str, Any]:
+    def execute(self, source_code: str, input_data: Optional[str], memory_limit_mb: Optional[int] = None) -> Dict[str, Any]:
         result_dict = {
             "verdict": RunVerdict.INTERNAL_ERROR,
             "stdout": "",
@@ -47,7 +47,8 @@ class Python3Adapter(BaseAdapter):
                     image="python:3.10-slim",
                     command=command,
                     workdir="/workspace",
-                    mounts={temp_dir: "/workspace"}
+                    mounts={temp_dir: "/workspace"},
+                    memory_limit_mb=memory_limit_mb
                 )
                 
                 result_dict["stdout"] = out["stdout"]
@@ -79,7 +80,7 @@ class Python3Adapter(BaseAdapter):
         return result_dict
 
 class Cpp17Adapter(BaseAdapter):
-    def execute(self, source_code: str, input_data: Optional[str]) -> Dict[str, Any]:
+    def execute(self, source_code: str, input_data: Optional[str], memory_limit_mb: Optional[int] = None) -> Dict[str, Any]:
         result_dict = {
             "verdict": RunVerdict.INTERNAL_ERROR,
             "stdout": "",
@@ -110,7 +111,8 @@ class Cpp17Adapter(BaseAdapter):
                     image="gcc:12",
                     command=compile_command,
                     workdir="/workspace",
-                    mounts={temp_dir: "/workspace"}
+                    mounts={temp_dir: "/workspace"},
+                    memory_limit_mb=memory_limit_mb
                 )
                 if compile_out["exit_code"] != 0:
                     result_dict["verdict"] = RunVerdict.COMPILE_ERROR
@@ -132,7 +134,8 @@ class Cpp17Adapter(BaseAdapter):
                     image="gcc:12",
                     command=run_command,
                     workdir="/workspace",
-                    mounts={temp_dir: "/workspace"}
+                    mounts={temp_dir: "/workspace"},
+                    memory_limit_mb=memory_limit_mb
                 )
                 
                 result_dict["stdout"] = run_out["stdout"]

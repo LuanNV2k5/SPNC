@@ -22,7 +22,7 @@ class Sandbox:
         except docker.errors.DockerException:
             self.client = None
 
-    def execute(self, image: str, command: str, workdir: str, mounts: Dict[str, str], input_data: Optional[str] = None) -> Dict[str, Any]:
+    def execute(self, image: str, command: str, workdir: str, mounts: Dict[str, str], input_data: Optional[str] = None, memory_limit_mb: Optional[int] = None) -> Dict[str, Any]:
         """
         Executes a command inside a disposable Docker container with strict limits.
         """
@@ -32,6 +32,8 @@ class Sandbox:
         # Map local temp dirs to container mount paths
         volumes = {local_path: {'bind': bind_path, 'mode': 'rw'} for local_path, bind_path in mounts.items()}
 
+        # Per-call memory limit (docs/36 D12), never above the global maximum
+        memory_mb = min(memory_limit_mb or settings.JUDGE_MEMORY_LIMIT_MB, settings.JUDGE_MEMORY_LIMIT_MB)
         container = None
         try:
             # Create container explicitly to control limits and networking
@@ -41,8 +43,8 @@ class Sandbox:
                 working_dir=workdir,
                 volumes=volumes,
                 network_disabled=True,
-                mem_limit=f"{settings.JUDGE_MEMORY_LIMIT_MB}m",
-                memswap_limit=f"{settings.JUDGE_MEMORY_LIMIT_MB}m",
+                mem_limit=f"{memory_mb}m",
+                memswap_limit=f"{memory_mb}m",
                 cpu_quota=settings.JUDGE_CPU_QUOTA,
                 cpu_period=100000,
                 pids_limit=settings.JUDGE_PIDS_LIMIT,

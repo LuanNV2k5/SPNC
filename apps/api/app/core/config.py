@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     JUDGE_PIDS_LIMIT: int = 64
     JUDGE_OUTPUT_LIMIT_BYTES: int = 1048576  # 1MB
     JUDGE_TEMP_DIR: str = "/tmp/spnc_judge"
+    # docs/36 D12: measured run time includes interpreter start inside the container
+    JUDGE_STARTUP_ALLOWANCE_MS: int = 500
+    # Submissions stuck in PENDING/RUNNING longer than this are re-queued by the reconciler
+    JUDGE_STALE_SUBMISSION_TIMEOUT_SECONDS: int = 600
 
     # Judge Signals
     SIGNAL_RULE_VERSION: str = "1.1.0"  # 1.1.0: LOC_ANOMALY final_loc after finalization (docs/34 D7)
