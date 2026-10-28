@@ -1,7 +1,7 @@
 # 35 — TEACHER OBSERVATION (PHASE 09) SPECIFICATION
 
 > **Module:** Teacher Observation, Annotations & Realtime Notification (Phase 09)
-> **Status:** APPROVED 2026-10-28 (all §9 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTED, PENDING LOCK
+> **Status:** APPROVED 2026-10-28 (all §9 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED (`phase-09-observation-locked`)
 > **Date:** 2026-10-28
 > **Parent Baseline:** `phase-08e-session-hardening-locked` (`d2ddfee`)
 > **Proposed Branch:** `phase09`
@@ -184,7 +184,7 @@ Approval (all recommendations or with overrides) is recorded in `docs/PROJECT_PR
 |---|---|---|
 | 09A | `8f21de9` | `app/services/observation_auth.py` (§3 rule), `app/services/observation.py`, `app/repositories/observation.py`, `app/schemas/observation.py`, `app/api/endpoints/observation.py`. `app/services/trace.py` (teacher endpoints → §3) and `app/services/run.py` (owner-only run reads, F1). |
 | 09B | `04252ae` | `app/services/annotation.py`, `app/repositories/annotation.py`, `app/api/endpoints/annotation.py`, `SignalStatus` aligned (D1), `TeacherAnnotation.deleted_at` (D7), migration `f7b2d4e61c38`. |
-| 09C | (this commit) | `app/realtime/hub.py` (LISTEN thread + per-subscriber §3 filtering), `app/api/endpoints/ws.py` (`/api/v1/ws/teacher`, first-message auth, 4401/4403 closes), `deps.resolve_user_from_token`, `WS_AUTH_TIMEOUT_SECONDS`, migration `a3c9e7d15f42` (NOTIFY triggers on signals, runs, sessions). |
+| 09C | `01994f0` | `app/realtime/hub.py` (LISTEN thread + per-subscriber §3 filtering), `app/api/endpoints/ws.py` (`/api/v1/ws/teacher`, first-message auth, 4401/4403 closes), `deps.resolve_user_from_token`, `WS_AUTH_TIMEOUT_SECONDS`, migration `a3c9e7d15f42` (NOTIFY triggers on signals, runs, sessions). |
 
 ### 10.2 Behaviour Changes to Earlier Phases
 - **Phase 06 teacher trace/scratchpad endpoints:** sessions outside the §3 rule now return 404 (they used to be visible to the class owner).
