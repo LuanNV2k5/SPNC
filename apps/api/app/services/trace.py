@@ -18,6 +18,9 @@ from app.services.storage import storage_adapter
 def _error(code: str, msg: str) -> dict:
     return {"error_code": code, "message": msg}
 
+RESERVED_EVENT_TYPES = {TraceEventType.SESSION_ENDED.value, TraceEventType.SUBMISSION_CREATED.value}
+
+
 def _get_student_session(db: Session, student: User, session_id: uuid.UUID) -> CodingSession:
     session = academic_repo.get_session_by_id(db, session_id)
     if not session:
@@ -36,9 +39,11 @@ def ingest_trace_batch(db: Session, student: User, session_id: uuid.UUID, req: T
     # docs/38 D8: exam sessions accept nothing after the participant's deadline
     assert_session_writable(db, session, datetime.now(timezone.utc))
 
-    # D4: SESSION_ENDED is server-authored only (written by session finalization)
-    if any(e.event_type == TraceEventType.SESSION_ENDED for e in req.events):
-        raise HTTPException(status_code=422, detail=_error("TRACE_EVENT_TYPE_RESERVED", "SESSION_ENDED is recorded by the server when a session ends"))
+    # D4: server-authored types; docs/38 D11 adds SUBMISSION_CREATED (written by the submit transaction)
+    reserved = sorted({e.event_type.value for e in req.events} & RESERVED_EVENT_TYPES)
+    if reserved:
+        raise HTTPException(status_code=422, detail=_error(
+            "TRACE_EVENT_TYPE_RESERVED", f"{', '.join(reserved)} is recorded by the server, not by clients"))
 
     # Serialize against finalization so no client event lands after SESSION_ENDED (docs/34 S5)
     session = repo.lock_session_for_ingest(db, session_id)
@@ -75,6 +80,10 @@ def ingest_trace_batch(db: Session, student: User, session_id: uuid.UUID, req: T
             
             if accepted_count > 0 and session.status != SessionStatus.ACTIVE.value:
                 raise HTTPException(status_code=403, detail=_error("SESSION_NOT_ACTIVE", "Cannot append new trace to an inactive session."))
+
+            # docs/38 D10 (REQ-TRACE-002): first code input = first EDITOR_CHANGED, server clock, set once
+            if accepted_count > 0 and any(e.event_type == TraceEventType.EDITOR_CHANGED for e in req.events):
+                repo.mark_first_code(db, session_id, datetime.now(timezone.utc))
                 
         db.commit()
         return accepted_count

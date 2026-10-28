@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, update
 from sqlalchemy.exc import IntegrityError
 
 from app.models.trace import TraceEvent, CodeSnapshot, ScratchpadRevision
@@ -167,6 +167,12 @@ def lock_session_for_ingest(db: Session, session_id: uuid.UUID) -> Optional[Codi
         .execution_options(populate_existing=True)
     )
     return db.scalar(stmt)
+
+def mark_first_code(db: Session, session_id: uuid.UUID, at: datetime) -> None:
+    """Sets coding_sessions.first_code_at once (atomic: only while still NULL)."""
+    db.execute(update(CodingSession).where(and_(CodingSession.id == session_id, CodingSession.first_code_at.is_(None)))
+               .values(first_code_at=at))
+
 
 def get_max_sequence(db: Session, session_id: uuid.UUID) -> int:
     return db.scalar(select(func.max(TraceEvent.sequence_number)).where(TraceEvent.session_id == session_id)) or 0

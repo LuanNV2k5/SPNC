@@ -1,7 +1,7 @@
 # 38 — MUST REQUIREMENT GAP CLOSURE (PHASE 12) SPECIFICATION
 
 > **Module:** Class invite codes, problem bank completeness and locks, exam edit lock and per-student duration, post-deadline ingest cutoff, run/first-code trace facts (Phase 12)
-> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — 12A/12B/12C IMPLEMENTED AND VERIFIED 2026-10-29 (§8); lock tag pending Project Owner review
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase11` @ `dfa16c6` (Phases 10 and 11 implemented, locks pending)
 > **Proposed Branch:** `phase12`
@@ -121,4 +121,39 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` with DCRs for D4 (Phase
 
 ## 8. Verification Record
 
-*To be completed at Phase 12 closure.*
+### 8.1 Changes (2026-10-29)
+| Sub-phase | Commit | Files |
+|---|---|---|
+| Approval | `8ac2904` | PROJECT_PROVENANCE_LOG (spec approval; DCRs SPNC_PROBLEM_LOCK_SCOPE, SPNC_RUN_EXECUTED_RECORD, SPNC_FIRST_CODE_FACT, SPNC_RESERVED_SUBMISSION_EVENT), OPEN_QUESTIONS (OQ-27) |
+| 12A | `b56f527` | migration `d7f3b1c2e845`; `models/class_org.py` (`invite_code`, generator), `models/problem.py` (statement fields, `difficulty`, `deleted_at`); `services/problem_guard.py`; academic service/repo/endpoints (join, rotate, filters, soft delete); `services/testcase.py` (lock via the guard) |
+| 12B | `6aeae89` | migration `e8a4c2d5f901`; `exams.duration_minutes`; `services/exam_access.py` (`participant_deadline`, `assert_participant_open`, `assert_session_writable`); trace/run services (cutoff); academic service (edit lock, duration validation); `services/exam_lifecycle.py` (participant deadline in finalize/timeout, overdue sweep) |
+| 12C | this commit | `services/trace.py` (reserved set, `first_code_at`), `repositories/trace.py` (`mark_first_code`), observation timeline `runs` + `first_code_at`, `SessionResponse.first_code_at` |
+
+### 8.2 Behaviour Notes
+- **Invite codes:** 8 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`; entry is case-insensitive. `ClassResponse` (owner endpoints) carries `invite_code`; `GET /my/classes` uses `StudentClassResponse` without it. Existing classes got codes in the migration. Errors: 404 `INVITE_CODE_INVALID`, 403 `CLASS_NOT_ACTIVE`, 409 `ALREADY_ENROLLED`.
+- **Problem lock:** status-based (SCHEDULED/ONGOING), 409 `PROBLEM_IN_ACTIVE_EXAM` for problem PATCH/DELETE and every test-case write. Replaces Phase 10A's time-window check and `PROBLEM_IN_ONGOING_EXAM`.
+- **Soft delete:** `DELETE /problems/{id}` → 204, sets `deleted_at`. Hidden from the owner bank and public bank; 404 for students and other teachers, for practice start, exam attach, class publication, problem PATCH and test-case writes. The owner can still read it (`deleted_at` in the response). Sessions, submissions and trace are untouched.
+- **Exam edit lock:** non-DRAFT exams refuse PATCH (except a body with only `allow_view_result_after`), attach/detach problem and assign/unassign class with 409 `EXAM_NOT_EDITABLE`. `allow_view_result_after` alone is refused only for CANCELLED.
+- **Duration:** `duration_minutes` > 0 and ≤ the window (422 `EXAM_DURATION_TOO_LONG`). The participant deadline applies to exam-session start, submit, finalize, trace batch, snapshot, run and scratchpad (403 `EXAM_ENDED`). The scheduler finalizes participants past their own deadline in ONGOING exams, using only snapshots received before that deadline.
+- **Cutoff without duration:** the deadline is `end_time`; an exam session also refuses writes once the exam is ENDED or CANCELLED.
+- **First code:** `coding_sessions.first_code_at` is set from the server clock when a batch first inserts an `EDITOR_CHANGED`, with a conditional update (only while NULL); retries do not move it. Exposed in session responses and the teacher timeline. Existing sessions keep NULL.
+- **Runs in timeline:** `GET …/sessions/{id}/timeline` adds `runs` (all runs of the session, oldest first, same shape as the teacher run list).
+- **Reserved types:** `SESSION_ENDED` and `SUBMISSION_CREATED` in a client batch → 422 `TRACE_EVENT_TYPE_RESERVED`, whole batch refused.
+
+### 8.3 Earlier Tests Adjusted
+- `test_testcases.py`: lock test rewritten for D4 (status-based, new error code, DRAFT/ENDED/CANCELLED editable).
+- `test_academic.py` (14 tests): exams are marked SCHEDULED after class/problem setup, because D6 forbids setup changes once published.
+
+### 8.4 Verification
+| Check | Environment | Result |
+|---|---|---|
+| Migrations `d7f3b1c2e845`, `e8a4c2d5f901` | Empty DB with two pre-existing classes, PostgreSQL 16.15 | up / down / up OK; each class backfilled with a distinct valid code |
+| 12A `test_phase12a_classes_problems.py` | Disposable PostgreSQL 16.15, `spnc_phase10_submission_test` | **8 passed** |
+| 12B `test_phase12b_exams.py` | same | **6 passed** |
+| 12C `test_phase12c_trace.py` | same | **3 passed** |
+| Phase 03–11 suites (incl. MinIO adapter on a disposable MinIO) | Fresh per-phase DBs migrated to head; Redis; Docker sandbox | **482 passed** |
+| **Total (AC-12-10)** | each file run on its own | **499 passed, 0 failed** |
+
+### 8.5 Known Limitations
+- The demo compose stack still runs Phase 11 code; Phase 12 was not rebuilt into it (kept running for the demo at the owner's request). The two new migrations were verified up/down/up on an empty database instead.
+- REQ-USER-007, REQ-TRACE-013 (SHOULD) and REQ-STU-004 (OQ-16) remain out of scope. OQ-27 records the `duration_minutes` assumption.

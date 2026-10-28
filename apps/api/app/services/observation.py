@@ -37,6 +37,7 @@ def _session_item(s: CodingSession, d: dict) -> dict:
         "exam_id": d["exam_id"],
         "exam_title": d["exam_title"],
         "opened_at": s.opened_at,
+        "first_code_at": s.first_code_at,
         "ended_at": s.ended_at,
         "status": _value(s.status),
         "termination_source": _value(s.termination_source),
@@ -94,6 +95,7 @@ def get_timeline(db: Session, teacher: User, class_id: uuid.UUID, student_id: uu
         "state": {"highest_contiguous_sequence": highest, "next_expected_sequence": next_expected},
         "signals": repo.signals_for_session(db, session_id),
         "snapshots": repo.snapshots_for_session(db, session_id),
+        "runs": repo.runs_for_session(db, session_id),
     }
 
 

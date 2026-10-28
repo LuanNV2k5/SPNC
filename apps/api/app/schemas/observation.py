@@ -32,6 +32,7 @@ class ObservedSessionItem(BaseModel):
     exam_id: Optional[uuid.UUID] = None
     exam_title: Optional[str] = None
     opened_at: datetime
+    first_code_at: Optional[datetime] = None   # REQ-TRACE-002 (DCR SPNC_FIRST_CODE_FACT)
     ended_at: Optional[datetime] = None
     status: str
     termination_source: Optional[str] = None
@@ -88,6 +89,8 @@ class TimelineResponse(BaseModel):
     state: TraceStateResponse
     signals: List[SignalItem]
     snapshots: List[SnapshotRef]
+    # REQ-TRACE-011: the Run rows are the RUN_EXECUTED record (DCR SPNC_RUN_EXECUTED_RECORD)
+    runs: List[RunResponse] = []
 
 
 class TeacherRunListResponse(BaseModel):

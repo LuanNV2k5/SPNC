@@ -339,6 +339,7 @@ class SessionResponse(BaseModel):
     status: str
     termination_source: Optional[str]
     opened_at: datetime
+    first_code_at: Optional[datetime] = None   # REQ-TRACE-002 (DCR SPNC_FIRST_CODE_FACT)
     ended_at: Optional[datetime]
     final_loc: Optional[int] = None
     working_time_seconds: Optional[int] = None
