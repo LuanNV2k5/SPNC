@@ -465,3 +465,63 @@ Since Phase 10A the server writes `SUBMISSION_CREATED` in the submit transaction
 
 Compatibility:
 Phase 06 clients sending that type now get 422. No stored data changes.
+
+---
+
+## Decision: Phase 13 Backend Completion Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve all". All recommendations D1–D6 in `docs/39_BACKEND_COMPLETION.md` §7 are approved without overrides.
+
+Approved Decisions (summary):
+D1 content-addressed snapshot key `snapshots/{session_id}/{sha256}.txt`, UNIQUE on `object_key` dropped; D2 orphan sweep in the reconciler (grace 24 h, hourly, batch 500); D3 idle threshold captured per session at creation; D4 client-driven checkpoint cadence advertised in trace-state; D5 invalid `SESSION_CHECKPOINT` rejected; D6 practice list = PUBLIC + own-class CLASS problems.
+
+---
+
+## Decision: DCR SPNC_SNAPSHOT_CONTENT_KEY
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_BEHAVIOUR_CORRECTION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29), docs/39.
+
+Change:
+New snapshot blobs use `snapshots/{session_id}/{sha256}.txt`; `code_snapshots.object_key` is no longer UNIQUE, so several snapshot rows may reference one immutable blob (docs/39 D1).
+
+Reason:
+With the Phase 06 key (`…/0_{sha256[:8]}.txt`) plus the UNIQUE constraint, a second snapshot of identical code in one session failed with 500 (reproduced 2026-10-29), blocking Run/Submit of unchanged code.
+
+Compatibility:
+Existing rows keep their old keys and stay readable. No data migration of blobs.
+
+---
+
+## Decision: DCR SPNC_CHECKPOINT_LINKAGE
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_BEHAVIOUR_CORRECTION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29), docs/39.
+
+Change:
+Client trace ingest rejects a `SESSION_CHECKPOINT` whose `payload.code_snapshot_id` is not a CHECKPOINT snapshot of the same session (422 `CHECKPOINT_SNAPSHOT_INVALID`, batch refused) (docs/39 D5).
+
+Reason:
+REQ-TRACE-013 requires the event to reference its snapshot; Phase 06 accepted any payload.
+
+Compatibility:
+Phase 06 clients sending unlinked checkpoints now get 422. Stored events are not modified.
