@@ -144,3 +144,67 @@ Compatibility Risks:
 
 Planned Independent QA:
 Unit 1B-2C TDD test suite validating canonical schema, types, nullable `final_loc` on active sessions, mathematical `delta`, zero-median handling, peer privacy, and entity isolation.
+
+---
+
+## Decision: DCR SPNC_IDLE_HISTORICAL_GAP_CONTRACT (GAP-08D-03 Ratification)
+
+Date:
+2026-10-28
+
+Status:
+APPROVED_IMPLEMENTATION_RATIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-28, after review of the Phase 08D verification record)
+
+Scope:
+- `docs/33_ATTENTION_SIGNAL_ARCHITECTURE.md` §4.1, §9 (REQ-IDLE-001), §10 (GAP-08D-03), §14 item 3
+- Locked implementation: tag `phase-08-signal-locked` (`a74e5d17f5bba85a04c07a5b1197fc95fe5607b3`)
+
+Context:
+GAP-08D-03 asked whether active-session (ongoing) idle monitoring alone satisfies `REQ-IDLE-001`. The baseline defines the idle interval as the `server_timestamp` gap between two consecutive meaningful events (`docs/01_DOMAIN.md` §1.7.4, DTI-09; `docs/02_USE_CASES.md` UC-E03; `docs/03_REQUIREMENTS.md` REQ-IDLE-001). Active-tail monitoring alone does not cover gaps that are already closed. Phase 08D implemented closed-gap detection and was locked pending this ratification.
+
+Ratified Contract:
+- Meaningful event set for IDLE is exactly `EDITOR_CHANGED`, `RUN_REQUESTED`, `SUBMISSION_CREATED` (Phase 06 enums for EDITOR_CHANGE, RUN_EXECUTED, SUBMISSION_MADE). `SESSION_CHECKPOINT` is a timeline marker (`docs/01_DOMAIN.md` B15) and does not reset inactivity.
+- Two detection modes:
+  1. Active tail (`evaluate_idle_detected`): ongoing inactivity of `ACTIVE` sessions.
+  2. Closed historical gap (`evaluate_historical_idle_gaps` via `trace_signal_outbox`, migration `c4819d7a2e10`): gaps between consecutive meaningful events (or `opened_at` and the first one), for sessions in any status. Evaluated only up to the highest contiguous `sequence_number`.
+- Overlap policy: both modes share the first-window dedup key `IDLE:{session_id}:{int(start)}:W1`. One idle episode yields one W1 alert. Evidence stored first is immutable and is never rewritten by the later closing event.
+- Evidence carries the canonical `{start_time, end_time, duration_seconds, meaningful_event_before_id, threshold_used}` plus legacy diagnostic keys. `rule_version = "1.0.0"`.
+
+Requirement Impact:
+- Satisfies `REQ-IDLE-001` (consecutive meaningful-event gaps) and `REQ-IDLE-002` (canonical evidence).
+- Preserves `REQ-IDLE-003` / `REQ-SIGNAL-004` (factual wording), `REQ-SESSION-005` (session status never mutated) and DTI-09.
+- No change to `docs/01_DOMAIN.md`, `docs/03_REQUIREMENTS.md` or `rule_version`.
+
+Compatibility Risks:
+- No API change. Schema change is limited to the additive `trace_signal_outbox` table and trigger (migration `c4819d7a2e10`). No historical migration is modified.
+- Bootstrap enqueues existing meaningful events idempotently (`ON CONFLICT (event_id) DO NOTHING`).
+
+Verification Evidence:
+Phase 08D verification record, `docs/33_ATTENTION_SIGNAL_ARCHITECTURE.md` §15.2: Phase 08 suite 89 passed; Phase 03-07 regression 262 passed on fresh PostgreSQL 16.
+
+Still Open:
+- GAP-08D-01 (`CodingSession.final_loc`, `REQ-SIGNAL-001`, `REQ-TRACE-015`) is not covered by this decision and remains OPEN_DECISION.
+
+---
+
+## Decision: GAP-08D-01 Scheduling (Session Final LOC)
+
+Date:
+2026-10-28
+
+Status:
+APPROVED_SCOPE_DECISION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-28): option "Session Hardening".
+
+Decision:
+`REQ-SIGNAL-001` (`CodingSession.final_loc`) and `REQ-TRACE-015` (server-recorded `SESSION_ENDED` with `final_loc`, `working_time_seconds`, `termination_actor`) are implemented in a dedicated sub-phase **Phase 08E — Session Hardening**. It runs after `phase-08-signal-locked` and before Phase 09. They are not deferred to Phase 09.
+
+Constraints:
+- Requires a new Alembic migration after `c4819d7a2e10`. Historical migrations stay untouched (PROJECT_RULES #4–5).
+- Already-stored `AttentionSignal.evidence` stays immutable. `LOC_ANOMALY.final_loc` stays null on signals created while the session was active (DCR SPNC_LOC_EVIDENCE_CONTRACT).
+- Specification: `docs/34_SESSION_HARDENING.md`. Implementation starts only after that specification is approved.
