@@ -362,3 +362,106 @@ D1 `minio` client library; D2 `STORAGE_BACKEND=memory|s3`, default memory; D3 ho
 Scope note:
 Implements the already-approved architecture (docs/07, docs/10, ADR-007). No requirement, endpoint contract or schema change.
 
+---
+
+## Decision: Phase 12 MUST Gap Closure Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve all". All recommendations D1–D11 in `docs/38_MUST_GAP_CLOSURE.md` §7 are approved without overrides.
+
+Approved Decisions (summary):
+D1 8-char unambiguous random invite code; D2 owner can rotate it; D3 removed member re-joins by re-activation; D4 problem fields and test cases locked in SCHEDULED/ONGOING exams; D5 problem soft delete; D6 exam edits DRAFT-only except `allow_view_result_after`; D7 `duration_minutes` = per-student limit, deadline `min(started_at + duration, end_time)` (OQ-27); D8 exam-session writes after the deadline → 403; D9 Run row is the RUN_EXECUTED record, runs shown in the teacher timeline; D10 `first_code_at` recorded at the first EDITOR_CHANGED; D11 `SUBMISSION_CREATED` reserved from client ingest.
+
+---
+
+## Decision: DCR SPNC_PROBLEM_LOCK_SCOPE
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_BEHAVIOUR_CORRECTION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29), docs/38.
+
+Change:
+Problem fields and all test-case writes are rejected (409 `PROBLEM_IN_ACTIVE_EXAM`) while the problem is attached to a SCHEDULED or ONGOING exam (docs/38 D4).
+
+Reason:
+REQ-PROB-004. Phase 10A blocked test-case edits only while ONGOING, so a SCHEDULED exam's validated test cases could still change.
+
+Compatibility:
+Phase 10A test-case edits on SCHEDULED exams are now refused; error code `PROBLEM_IN_ONGOING_EXAM` is replaced by `PROBLEM_IN_ACTIVE_EXAM`.
+
+---
+
+## Decision: DCR SPNC_RUN_EXECUTED_RECORD
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_BEHAVIOUR_CORRECTION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29), docs/38.
+
+Change:
+REQ-TRACE-011's `RUN_EXECUTED` is the persisted `Run` row (snapshot, input, output, verdict, error, execution time). No server trace event is written on run completion; the client's `RUN_REQUESTED` stays the meaningful event. The teacher timeline includes the session's runs (docs/38 D9).
+
+Reason:
+While a session is open the client owns `sequence_number`; a server event would collide with it, and runs can finish after `SESSION_ENDED`, which must stay the last event.
+
+Compatibility:
+No stored data changes. Timeline responses gain a `runs` list.
+
+---
+
+## Decision: DCR SPNC_FIRST_CODE_FACT
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_BEHAVIOUR_CORRECTION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29), docs/38.
+
+Change:
+REQ-TRACE-002's `FIRST_CODE_INPUT` is recorded as `coding_sessions.first_code_at` (server clock) at the first ingested `EDITOR_CHANGED`, set once; no separate event (docs/38 D10).
+
+Reason:
+Same sequence-ownership constraint as SPNC_RUN_EXECUTED_RECORD; the column enforces once-per-session.
+
+Compatibility:
+Existing sessions keep `first_code_at = null` (not backfilled from history).
+
+---
+
+## Decision: DCR SPNC_RESERVED_SUBMISSION_EVENT
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_BEHAVIOUR_CORRECTION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29), docs/38.
+
+Change:
+Client trace ingest rejects `SUBMISSION_CREATED` with 422 `TRACE_EVENT_TYPE_RESERVED`, like `SESSION_ENDED` (docs/38 D11).
+
+Reason:
+Since Phase 10A the server writes `SUBMISSION_CREATED` in the submit transaction; a client copy would be a fake submission marker.
+
+Compatibility:
+Phase 06 clients sending that type now get 422. No stored data changes.

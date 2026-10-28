@@ -314,6 +314,14 @@ Mỗi OQ gồm:
 
 ---
 
+### OQ-27 — OPEN | NON_BLOCKING_V1
+
+**Question:** What does `Exam.duration_minutes` mean (REQ-EXAM-001; not defined in docs 01–03)?
+**Current assumption (docs/38 D7):** Optional per-student limit; deadline = `min(participation.started_at + duration_minutes, end_time)`; null = no per-student limit.
+**Owner:** Product Owner | **Status:** OPEN
+
+---
+
 ### OQ-25 — OUT_OF_SCOPE (V1)
 
 **Question:** Forgot password / self-service password recovery?
@@ -343,6 +351,6 @@ Mỗi OQ gồm:
 | Phase Blocked | OQ-IDs |
 |---------------|--------|
 | BLOCKING_IMPLEMENTATION | OQ-01, 02, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 15, 16, 23, 24 |
-| NON_BLOCKING_V1 | OQ-03 |
+| NON_BLOCKING_V1 | OQ-03, 27 |
 | BLOCKING_DEPLOYMENT | OQ-26 |
 | BLOCKING_ARCHITECTURE | **None remaining** ✓ |
