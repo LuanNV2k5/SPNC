@@ -1,6 +1,7 @@
 import uuid
 import hashlib
 import json
+from datetime import datetime, timezone
 from typing import Tuple, List
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -11,6 +12,7 @@ from app.models.trace import TraceEventType
 from app.schemas.trace import TraceBatchRequest, SnapshotCreate
 from app.repositories import trace as repo
 from app.repositories import academic as academic_repo
+from app.services.exam_access import assert_session_writable
 from app.services.storage import storage_adapter
 
 def _error(code: str, msg: str) -> dict:
@@ -31,6 +33,8 @@ def _generate_fingerprint(event_type: str, payload: dict) -> str:
 
 def ingest_trace_batch(db: Session, student: User, session_id: uuid.UUID, req: TraceBatchRequest) -> int:
     session = _get_student_session(db, student, session_id)
+    # docs/38 D8: exam sessions accept nothing after the participant's deadline
+    assert_session_writable(db, session, datetime.now(timezone.utc))
 
     # D4: SESSION_ENDED is server-authored only (written by session finalization)
     if any(e.event_type == TraceEventType.SESSION_ENDED for e in req.events):
@@ -96,6 +100,8 @@ def get_teacher_trace_state(db: Session, teacher: User, class_id: uuid.UUID, stu
 
 def create_snapshot(db: Session, student: User, session_id: uuid.UUID, req: SnapshotCreate):
     session = _get_student_session(db, student, session_id)
+    # docs/38 D8: exam sessions accept nothing after the participant's deadline
+    assert_session_writable(db, session, datetime.now(timezone.utc))
     
     # Note: explicit checkpoint can only happen if active (for runs/submits logic applies elsewhere, but explicit checkpoints for trace logic should probably require active, but we can just allow it if needed, wait - L10 says final checkpoint semantics preserved. Just allow).
     
@@ -136,6 +142,8 @@ def get_student_scratchpad(db: Session, student: User, session_id: uuid.UUID):
 
 def save_student_scratchpad(db: Session, student: User, session_id: uuid.UUID, req: ScratchpadRequest):
     session = _get_student_session(db, student, session_id)
+    # docs/38 D8: exam sessions accept nothing after the participant's deadline
+    assert_session_writable(db, session, datetime.now(timezone.utc))
     if session.status != SessionStatus.ACTIVE.value:
         raise HTTPException(status_code=403, detail=_error("SESSION_NOT_ACTIVE", "Cannot mutate scratchpad for an inactive session."))
         

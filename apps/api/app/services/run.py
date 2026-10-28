@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -6,6 +7,7 @@ from app.models.session import CodingSession, SessionStatus
 from app.models.run_submit import Run
 from app.models.trace import CodeSnapshot
 from app.repositories.run import run_repository
+from app.services.exam_access import assert_session_writable
 from app.services.queue import judge_queue
 
 class RunService:
@@ -20,6 +22,9 @@ class RunService:
             
         if coding_session.status != SessionStatus.ACTIVE:
             raise HTTPException(status_code=403, detail="RUN_SESSION_NOT_ACTIVE: Session is not ACTIVE")
+
+        # docs/38 D8: no runs after the participant's exam deadline
+        assert_session_writable(db, coding_session, datetime.now(timezone.utc))
 
         # Verify snapshot exists and belongs to this session
         snapshot = db.get(CodeSnapshot, snapshot_id)

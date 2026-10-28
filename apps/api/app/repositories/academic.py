@@ -222,6 +222,7 @@ def create_exam(
     start_time: datetime,
     end_time: datetime,
     allow_view_result_after: bool = False,
+    duration_minutes: Optional[int] = None,
 ) -> Exam:
     exam = Exam(
         owner_id=owner_id,
@@ -231,6 +232,7 @@ def create_exam(
         end_time=end_time,
         status=ExamStatus.DRAFT.value,
         allow_view_result_after=allow_view_result_after,
+        duration_minutes=duration_minutes,
     )
     db.add(exam)
     db.flush()

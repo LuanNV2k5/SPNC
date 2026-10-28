@@ -40,6 +40,9 @@ class Exam(Base, TimestampMixin):
     # Materialized status for quick query, but Authorization must use start_time/end_time
     status: Mapped[ExamStatus] = mapped_column(String(20), default=ExamStatus.DRAFT, index=True)
 
+    # REQ-EXAM-001; docs/38 D7: per-student limit, deadline = min(started_at + duration, end_time)
+    duration_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     # D14: students see exam results only after ENDED and when this is set
     allow_view_result_after: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # REQ-EXAM-010 cancellation metadata

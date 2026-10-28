@@ -21,6 +21,7 @@ from app.models.user import AuditLog, User
 from app.repositories import academic as academic_repo
 from app.repositories import submission as submission_repo
 from app.services.queue import judge_queue
+from app.services.exam_access import participant_deadline
 from app.services.session_lifecycle import finalize_session
 from app.services.submission import record_submission
 
@@ -107,9 +108,9 @@ def finalize_participation(db: Session, student: User, exam_id: uuid.UUID) -> Ex
         raise HTTPException(status_code=404, detail=_error("PARTICIPATION_NOT_FOUND", "Participation not found"))
     if _value(participation.status) != ParticipationStatus.IN_PROGRESS.value:
         raise HTTPException(status_code=409, detail=_error("PARTICIPATION_NOT_ACTIVE", "Participation is not in progress"))
-    # After end_time the timeout path owns the participation, whatever the scheduler lag
+    # After the participant's deadline the timeout path owns the participation, whatever the scheduler lag
     now = _now()
-    if now >= exam.end_time:
+    if now >= participant_deadline(exam, participation):
         raise HTTPException(status_code=403, detail=_error("EXAM_ENDED", "Exam has ended"))
 
     for session in _active_sessions(db, participation.id):
@@ -180,7 +181,7 @@ def admin_cancel_exam(db: Session, admin: User, exam_id: uuid.UUID) -> Exam:
 # ---------------------------------------------------------------------------
 
 def _timeout_snapshot(db: Session, session: CodingSession, end_time: datetime) -> Optional[CodeSnapshot]:
-    """Latest server-received snapshot before end_time, if newer than the session's last submission (D1)."""
+    """Latest server-received snapshot before the deadline, if newer than the session's last submission (D1)."""
     snapshot = db.scalar(select(CodeSnapshot).where(and_(
         CodeSnapshot.session_id == session.id, CodeSnapshot.created_at < end_time,
     )).order_by(CodeSnapshot.created_at.desc(), CodeSnapshot.id.desc()).limit(1))
@@ -205,12 +206,13 @@ def expire_participation(db: Session, exam: Exam, participation_id: uuid.UUID) -
                               .with_for_update().execution_options(populate_existing=True))
     if not participation or _value(participation.status) != ParticipationStatus.IN_PROGRESS.value:
         return []
+    deadline = participant_deadline(exam, participation)   # docs/38 D7; end_time without a duration
     created = []
     for session in _active_sessions(db, participation.id):
         locked = academic_repo.lock_session_for_finalize(db, session.id)
         if _value(locked.status) != SessionStatus.ACTIVE.value:
             continue
-        snapshot = _timeout_snapshot(db, locked, exam.end_time)
+        snapshot = _timeout_snapshot(db, locked, deadline)
         if snapshot is not None:
             created.append(record_submission(db, locked, snapshot, exam.id, SubmissionSource.SYSTEM_EXAM_TIMEOUT).id)
         finalize_session(db, locked.id, SessionStatus.ENDED, TerminationSource.SYSTEM_EXAM_TIMEOUT)
@@ -266,10 +268,41 @@ def _end_due_exams(db: Session, now: datetime) -> Tuple[int, List[uuid.UUID]]:
     return ended, submissions
 
 
+def _expire_overdue_participants(db: Session, now: datetime) -> List[uuid.UUID]:
+    """docs/38 D7: in a running exam, a participant whose own duration ran out is finalized like a timeout."""
+    submissions = []
+    rows = db.execute(
+        select(ExamParticipation.id, ExamParticipation.exam_id).join(Exam, Exam.id == ExamParticipation.exam_id)
+        .where(and_(
+            Exam.status == ExamStatus.ONGOING.value,
+            Exam.duration_minutes.isnot(None),
+            ExamParticipation.status == ParticipationStatus.IN_PROGRESS.value,
+            ExamParticipation.started_at.isnot(None),
+        ))
+    ).all()
+    for participation_id, exam_id in rows:
+        exam = db.get(Exam, exam_id)
+        participation = db.get(ExamParticipation, participation_id)
+        if participant_deadline(exam, participation) > now:
+            continue
+        try:
+            new_ids = expire_participation(db, exam, participation_id)
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception(f"Duration finalization failed for participation {participation_id}")
+            continue
+        for sid in new_ids:
+            judge_queue.enqueue_submission(sid)
+        submissions.extend(new_ids)
+    return submissions
+
+
 def run_tick(db: Session, now: Optional[datetime] = None) -> dict:
     """One idempotent scheduler pass. An exam whose whole window passed while the scheduler was
     down goes SCHEDULED -> ONGOING -> ENDED within the same tick."""
     now = now or _now()
     started = _start_due_exams(db, now)
-    ended, submissions = _end_due_exams(db, now)
-    return {"started": started, "ended": ended, "auto_submissions": submissions}
+    submissions = _expire_overdue_participants(db, now)
+    ended, at_end = _end_due_exams(db, now)
+    return {"started": started, "ended": ended, "auto_submissions": submissions + at_end}

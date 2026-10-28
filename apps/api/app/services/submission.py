@@ -21,7 +21,7 @@ from app.models.user import User
 from app.repositories import academic as academic_repo
 from app.repositories import submission as submission_repo
 from app.repositories import trace as trace_repo
-from app.services.exam_access import assert_exam_open
+from app.services.exam_access import assert_participant_open
 from app.services.judge.grader import grade
 from app.services.queue import judge_queue
 from app.services.session_lifecycle import finalize_session
@@ -56,7 +56,7 @@ def _check_exam_window(db: Session, participation_id: uuid.UUID) -> uuid.UUID:
     if not participation or _value(participation.status) != ParticipationStatus.IN_PROGRESS.value:
         raise HTTPException(status_code=403, detail=_error("PARTICIPATION_NOT_ACTIVE", "Participation is not in progress"))
     exam = db.get(Exam, participation.exam_id)
-    assert_exam_open(exam, datetime.now(timezone.utc))
+    assert_participant_open(exam, participation, datetime.now(timezone.utc))   # D11 + docs/38 D7 deadline
     return exam.id
 
 

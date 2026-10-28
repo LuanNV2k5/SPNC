@@ -199,6 +199,7 @@ class ExamCreateRequest(BaseModel):
     description: Optional[str] = None
     start_time: datetime
     end_time: datetime
+    duration_minutes: Optional[int] = Field(None, gt=0)
     allow_view_result_after: bool = False
 
     @field_validator("end_time")
@@ -215,6 +216,7 @@ class ExamUpdateRequest(BaseModel):
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = Field(None, gt=0)
     allow_view_result_after: Optional[bool] = None
 
 
@@ -232,6 +234,7 @@ class ExamResponse(BaseModel):
     start_time: datetime
     end_time: datetime
     status: str
+    duration_minutes: Optional[int] = None
     allow_view_result_after: bool = False
     cancelled_at: Optional[datetime] = None
     cancel_reason: Optional[str] = None

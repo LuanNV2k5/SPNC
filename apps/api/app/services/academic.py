@@ -257,7 +257,19 @@ def unpublish_from_class(db: Session, owner: User, problem_id: uuid.UUID, class_
 # EXAM
 # ============================================================
 
+def _check_duration(start_time, end_time, duration_minutes) -> None:
+    """docs/38 D7: a per-student limit cannot exceed the exam window."""
+    if duration_minutes is not None and duration_minutes * 60 > (end_time - start_time).total_seconds():
+        raise HTTPException(status_code=422, detail=_error("EXAM_DURATION_TOO_LONG", "duration_minutes exceeds the exam window"))
+
+def _assert_exam_editable(e) -> None:
+    """REQ-EXAM-006, docs/38 D6: schedule, problems and classes change only while DRAFT."""
+    status = e.status if isinstance(e.status, str) else e.status.value
+    if status != "DRAFT":
+        raise HTTPException(status_code=409, detail=_error("EXAM_NOT_EDITABLE", "Only a DRAFT exam can be edited"))
+
 def create_exam(db: Session, owner: User, req: ExamCreateRequest):
+    _check_duration(req.start_time, req.end_time, req.duration_minutes)
     return repo.create_exam(
         db,
         owner_id=owner.id,
@@ -266,6 +278,7 @@ def create_exam(db: Session, owner: User, req: ExamCreateRequest):
         start_time=req.start_time,
         end_time=req.end_time,
         allow_view_result_after=req.allow_view_result_after,
+        duration_minutes=req.duration_minutes,
     )
 
 def list_exams(db: Session, owner: User, skip: int, limit: int):
@@ -282,10 +295,20 @@ def get_exam(db: Session, owner: User, exam_id: uuid.UUID):
 def update_exam(db: Session, owner: User, exam_id: uuid.UUID, req: ExamUpdateRequest):
     e = get_exam(db, owner, exam_id)
     update_data = req.model_dump(exclude_none=True)
+    status = e.status if isinstance(e.status, str) else e.status.value
+    if set(update_data) == {"allow_view_result_after"}:
+        # D6 exception: result visibility may change after publication (D14), not once cancelled
+        if status == "CANCELLED":
+            raise HTTPException(status_code=409, detail=_error("EXAM_NOT_EDITABLE", "A cancelled exam cannot be edited"))
+    elif update_data:
+        _assert_exam_editable(e)
+        _check_duration(update_data.get("start_time", e.start_time), update_data.get("end_time", e.end_time),
+                        update_data.get("duration_minutes", e.duration_minutes))
     return repo.update_exam(db, e, **update_data)
 
 def attach_problem(db: Session, owner: User, exam_id: uuid.UUID, req: AttachProblemRequest):
     e = get_exam(db, owner, exam_id)
+    _assert_exam_editable(e)
     p = repo.get_problem_by_id(db, req.problem_id)
     if not p:
         raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
@@ -312,6 +335,7 @@ def list_exam_problems(db: Session, owner: User, exam_id: uuid.UUID):
 
 def detach_problem(db: Session, owner: User, exam_id: uuid.UUID, problem_id: uuid.UUID):
     e = get_exam(db, owner, exam_id)
+    _assert_exam_editable(e)
     ep = repo.get_exam_problem(db, exam_id, problem_id)
     if not ep:
         raise HTTPException(status_code=404, detail=_error("EXAM_PROBLEM_NOT_FOUND", "Problem not attached"))
@@ -319,6 +343,7 @@ def detach_problem(db: Session, owner: User, exam_id: uuid.UUID, problem_id: uui
 
 def assign_class(db: Session, owner: User, exam_id: uuid.UUID, req: AssignClassRequest):
     e = get_exam(db, owner, exam_id)
+    _assert_exam_editable(e)
     cls = repo.get_class_by_id(db, req.class_id)
     if not cls:
         raise HTTPException(status_code=404, detail=_error("CLASS_NOT_FOUND", "Class not found"))
@@ -342,6 +367,7 @@ def list_exam_classes(db: Session, owner: User, exam_id: uuid.UUID):
 
 def unassign_class(db: Session, owner: User, exam_id: uuid.UUID, class_id: uuid.UUID):
     e = get_exam(db, owner, exam_id)
+    _assert_exam_editable(e)
     ea = repo.get_exam_assignment(db, exam_id, class_id)
     if not ea:
         raise HTTPException(status_code=404, detail=_error("ASSIGNMENT_NOT_FOUND", "Assignment not found"))
@@ -489,8 +515,8 @@ def start_exam_session(db: Session, student: User, participation_id: uuid.UUID, 
         raise HTTPException(status_code=403, detail=_error("PARTICIPATION_NOT_ACTIVE", "Participation is not in progress"))
 
     e = repo.get_exam_by_id(db, participation.exam_id)
-    from app.services.exam_access import assert_exam_open
-    assert_exam_open(e, _now_utc())
+    from app.services.exam_access import assert_participant_open
+    assert_participant_open(e, participation, _now_utc())   # D11 + docs/38 D7 deadline
 
     ep = repo.get_exam_problem(db, e.id, req.problem_id)
     if not ep:
