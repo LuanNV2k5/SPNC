@@ -49,14 +49,9 @@ class RunService:
         if not coding_session:
             raise HTTPException(status_code=404, detail="Session not found")
             
-        # Teacher or owning student check
+        # Owning student only; teachers read runs through the class-scoped observation API (docs/35 F1)
         if coding_session.student_id != user_id:
-            # Teacher access checks could be more robust based on existing rules, but for now reject if not owner
-            # (Assuming auth dependency handles teacher vs student correctly. In Phase06 trace, teacher can read. We'll add teacher check.)
-            from app.models.user import User, RoleEnum
-            user = db.get(User, user_id)
-            if not user or user.role != RoleEnum.TEACHER:
-                raise HTTPException(status_code=403, detail="RUN_FORBIDDEN: Unauthorized Run read denied")
+            raise HTTPException(status_code=403, detail="RUN_FORBIDDEN: Unauthorized Run read denied")
 
         run = run_repository.get(db, run_id)
         if not run:
@@ -72,11 +67,9 @@ class RunService:
         if not coding_session:
             raise HTTPException(status_code=404, detail="Session not found")
             
+        # Owning student only; teachers read runs through the class-scoped observation API (docs/35 F1)
         if coding_session.student_id != user_id:
-            from app.models.user import User, RoleEnum
-            user = db.get(User, user_id)
-            if not user or user.role != RoleEnum.TEACHER:
-                raise HTTPException(status_code=403, detail="RUN_FORBIDDEN: Unauthorized Run read denied")
+            raise HTTPException(status_code=403, detail="RUN_FORBIDDEN: Unauthorized Run read denied")
 
         return run_repository.get_by_session(db, session_id)
 

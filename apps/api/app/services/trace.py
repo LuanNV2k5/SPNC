@@ -82,22 +82,9 @@ def get_trace_state(db: Session, student: User, session_id: uuid.UUID) -> Tuple[
     return repo.get_trace_state(db, session_id)
 
 def _authorize_teacher_session(db: Session, teacher: User, class_id: uuid.UUID, student_id: uuid.UUID, session_id: uuid.UUID) -> CodingSession:
-    # 1. Verify class ownership
-    cls = academic_repo.get_class_by_id(db, class_id)
-    if not cls or cls.owner_id != teacher.id:
-        raise HTTPException(status_code=403, detail=_error("FORBIDDEN_RESOURCE", "Not your class"))
-    
-    # 2. Verify student membership
-    membership = academic_repo.get_membership(db, class_id, student_id)
-    if not membership or not membership.is_active:
-        raise HTTPException(status_code=403, detail=_error("FORBIDDEN_RESOURCE", "Student not in your class"))
-        
-    # 3. Verify session belongs to student
-    session = academic_repo.get_session_by_id(db, session_id)
-    if not session or session.student_id != student_id:
-        raise HTTPException(status_code=404, detail=_error("SESSION_NOT_FOUND", "Session not found for student"))
-        
-    return session
+    # Phase 09 D2: class-context session visibility (docs/35 §3)
+    from app.services.observation_auth import authorize_session
+    return authorize_session(db, teacher, class_id, student_id, session_id)
 
 def get_teacher_trace_history(db: Session, teacher: User, class_id: uuid.UUID, student_id: uuid.UUID, session_id: uuid.UUID, skip: int, limit: int):
     session = _authorize_teacher_session(db, teacher, class_id, student_id, session_id)
