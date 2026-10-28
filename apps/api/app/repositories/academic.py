@@ -31,6 +31,14 @@ def create_class(db: Session, owner_id: uuid.UUID, name: str, academic_year: str
     return cls
 
 
+def get_class_by_invite_code(db: Session, invite_code: str) -> Optional[Class]:
+    return db.query(Class).filter(Class.invite_code == invite_code).first()
+
+
+def invite_code_taken(db: Session, invite_code: str) -> bool:
+    return db.query(Class.id).filter(Class.invite_code == invite_code).first() is not None
+
+
 def get_class_by_id(db: Session, class_id: uuid.UUID) -> Optional[Class]:
     return db.query(Class).filter(Class.id == class_id).first()
 
@@ -118,27 +126,9 @@ def student_in_any_class(db: Session, student_id: uuid.UUID) -> bool:
 # Problem
 # ---------------------------------------------------------------------------
 
-def create_problem(
-    db: Session,
-    owner_id: uuid.UUID,
-    title: str,
-    description: str,
-    visibility: str = "PRIVATE",
-    time_limit_ms: int = 1000,
-    memory_limit_mb: int = 256,
-    supported_languages: Optional[List[str]] = None,
-) -> Problem:
-    if supported_languages is None:
-        supported_languages = ["CPP17", "PYTHON3"]
-    p = Problem(
-        owner_id=owner_id,
-        title=title,
-        description=description,
-        visibility=visibility,
-        time_limit_ms=time_limit_ms,
-        memory_limit_mb=memory_limit_mb,
-        supported_languages=supported_languages,
-    )
+def create_problem(db: Session, owner_id: uuid.UUID, **fields) -> Problem:
+    fields.setdefault("supported_languages", ["CPP17", "PYTHON3"])
+    p = Problem(owner_id=owner_id, **fields)
     db.add(p)
     db.flush()
     return p
@@ -148,15 +138,25 @@ def get_problem_by_id(db: Session, problem_id: uuid.UUID) -> Optional[Problem]:
     return db.query(Problem).filter(Problem.id == problem_id).first()
 
 
-def get_problems_by_owner(db: Session, owner_id: uuid.UUID, skip: int = 0, limit: int = 50) -> Tuple[List[Problem], int]:
-    q = db.query(Problem).filter(Problem.owner_id == owner_id)
+def get_problems_by_owner(
+    db: Session, owner_id: uuid.UUID, skip: int = 0, limit: int = 50,
+    difficulty: Optional[str] = None, language: Optional[str] = None, visibility: Optional[str] = None,
+) -> Tuple[List[Problem], int]:
+    """Owner's bank (REQ-PROB-006); soft-deleted problems are hidden (docs/38 D5)."""
+    q = db.query(Problem).filter(Problem.owner_id == owner_id, Problem.deleted_at.is_(None))
+    if difficulty:
+        q = q.filter(Problem.difficulty == difficulty)
+    if visibility:
+        q = q.filter(Problem.visibility == visibility)
+    if language:
+        q = q.filter(Problem.supported_languages.contains([language]))
     total = q.count()
     items = q.order_by(Problem.created_at.desc()).offset(skip).limit(limit).all()
     return items, total
 
 
 def get_public_problems(db: Session, skip: int = 0, limit: int = 50) -> Tuple[List[Problem], int]:
-    q = db.query(Problem).filter(Problem.visibility == ProblemVisibility.PUBLIC.value)
+    q = db.query(Problem).filter(Problem.visibility == ProblemVisibility.PUBLIC.value, Problem.deleted_at.is_(None))
     total = q.count()
     items = q.order_by(Problem.created_at.desc()).offset(skip).limit(limit).all()
     return items, total

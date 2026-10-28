@@ -4,18 +4,18 @@
 ever returned to the owning TEACHER.
 """
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import and_, exists, func, select
 from sqlalchemy.orm import Session
 
-from app.models.exam import Exam, ExamParticipation, ExamProblem, ParticipationStatus
+from app.models.exam import ExamParticipation, ExamProblem, ParticipationStatus
 from app.models.problem import Problem, ProblemTestCase
 from app.models.user import User
 from app.repositories import academic as academic_repo
 from app.schemas.testcase import TestCaseCreate, TestCaseUpdate
 from app.services import academic as academic_svc
+from app.services.problem_guard import assert_not_deleted, assert_problem_mutable
 
 
 def _error(code: str, msg: str) -> dict:
@@ -39,22 +39,15 @@ def _owned_problem(db: Session, teacher: User, problem_id: uuid.UUID) -> Problem
     return p
 
 
-def problem_in_running_exam(db: Session, problem_id: uuid.UUID) -> bool:
-    """True if the problem belongs to a non-cancelled exam whose time window is open now."""
-    now = datetime.now(timezone.utc)
-    return bool(db.scalar(select(exists(
-        select(ExamProblem.id).join(Exam, Exam.id == ExamProblem.exam_id).where(and_(
-            ExamProblem.problem_id == problem_id,
-            Exam.status != "CANCELLED",
-            Exam.start_time <= now,
-            Exam.end_time > now,
-        ))
-    ))))
+def _owned_live_problem(db: Session, teacher: User, problem_id: uuid.UUID) -> Problem:
+    p = _owned_problem(db, teacher, problem_id)
+    assert_not_deleted(p)
+    return p
 
 
 def _guard_not_running(db: Session, problem_id: uuid.UUID) -> None:
-    if problem_in_running_exam(db, problem_id):
-        raise HTTPException(status_code=409, detail=_error("PROBLEM_IN_ONGOING_EXAM", "Test cases cannot change while an exam using this problem is running"))
+    # docs/38 D4: frozen while any SCHEDULED/ONGOING exam uses the problem
+    assert_problem_mutable(db, problem_id)
 
 
 def list_test_cases(db: Session, teacher: User, problem_id: uuid.UUID):
@@ -65,7 +58,7 @@ def list_test_cases(db: Session, teacher: User, problem_id: uuid.UUID):
 
 
 def create_test_case(db: Session, teacher: User, problem_id: uuid.UUID, req: TestCaseCreate) -> dict:
-    _owned_problem(db, teacher, problem_id)
+    _owned_live_problem(db, teacher, problem_id)
     _guard_not_running(db, problem_id)
     order_index = req.order_index
     if order_index is None:
@@ -85,7 +78,7 @@ def create_test_case(db: Session, teacher: User, problem_id: uuid.UUID, req: Tes
 
 
 def _owned_case(db: Session, teacher: User, problem_id: uuid.UUID, tc_id: uuid.UUID) -> ProblemTestCase:
-    _owned_problem(db, teacher, problem_id)
+    _owned_live_problem(db, teacher, problem_id)
     tc = db.get(ProblemTestCase, tc_id)
     if not tc or tc.problem_id != problem_id:
         raise HTTPException(status_code=404, detail=_error("TEST_CASE_NOT_FOUND", "Test case not found"))

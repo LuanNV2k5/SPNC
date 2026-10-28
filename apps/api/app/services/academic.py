@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.repositories import academic as repo
+from app.services.problem_guard import assert_not_deleted, assert_problem_mutable
 from app.schemas.academic import (
     ClassCreateRequest, ClassUpdateRequest,
     EnrollRequest,
@@ -55,6 +56,15 @@ def update_class(db: Session, owner: User, class_id: uuid.UUID, req: ClassUpdate
     update_data = req.model_dump(exclude_none=True)
     return repo.update_class(db, cls, **update_data)
 
+def rotate_invite_code(db: Session, owner: User, class_id: uuid.UUID):
+    """docs/38 D2: replaces the code; the old one stops working immediately."""
+    from app.models.class_org import generate_invite_code
+    cls = get_class(db, owner, class_id)
+    code = generate_invite_code()
+    while repo.invite_code_taken(db, code):
+        code = generate_invite_code()
+    return repo.update_class(db, cls, invite_code=code)
+
 def list_classes(db: Session, owner: User, skip: int, limit: int):
     return repo.get_classes_by_owner(db, owner_id=owner.id, skip=skip, limit=limit)
 
@@ -90,6 +100,27 @@ def enroll_student(db: Session, owner: User, class_id: uuid.UUID, req: EnrollReq
     except IntegrityError:
         raise HTTPException(status_code=409, detail=_error("ALREADY_ENROLLED", "Student already enrolled"))
 
+def join_class(db: Session, student: User, invite_code: str):
+    """UC-B03 / REQ-CLASS-005. Enrollment is auto-approved (OQ-08 current assumption)."""
+    cls = repo.get_class_by_invite_code(db, invite_code.strip().upper())
+    if not cls:
+        raise HTTPException(status_code=404, detail=_error("INVITE_CODE_INVALID", "Invite code not found"))
+    if not cls.is_active:
+        raise HTTPException(status_code=403, detail=_error("CLASS_NOT_ACTIVE", "This class is not accepting members"))
+    existing = repo.get_membership(db, cls.id, student.id)
+    if existing:
+        if existing.is_active:
+            raise HTTPException(status_code=409, detail=_error("ALREADY_ENROLLED", "You are already in this class"))
+        # docs/38 D3: a removed member re-joins on the same record
+        existing.is_active = True
+        db.flush()
+        return existing
+    try:
+        with db.begin_nested():
+            return repo.enroll_student(db, class_id=cls.id, student_id=student.id)
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail=_error("ALREADY_ENROLLED", "You are already in this class"))
+
 def list_class_members(db: Session, owner: User, class_id: uuid.UUID, skip: int, limit: int):
     cls = get_class(db, owner, class_id)
     return repo.get_memberships_by_class(db, class_id, skip=skip, limit=limit)
@@ -117,20 +148,14 @@ def list_student_classes(db: Session, student: User, skip: int, limit: int):
 # ============================================================
 
 def create_problem(db: Session, owner: User, req: ProblemCreateRequest):
-    return repo.create_problem(
-        db,
-        owner_id=owner.id,
-        title=req.title,
-        description=req.description,
-        visibility=req.visibility,
-        time_limit_ms=req.time_limit_ms,
-        memory_limit_mb=req.memory_limit_mb,
-        supported_languages=req.supported_languages,
-    )
+    return repo.create_problem(db, owner_id=owner.id, **req.model_dump())
 
 def get_problem(db: Session, user: User, problem_id: uuid.UUID):
     p = repo.get_problem_by_id(db, problem_id)
     if not p:
+        raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
+    # docs/38 D5: a deleted problem stays readable to its owner only (history)
+    if p.deleted_at is not None and p.owner_id != user.id:
         raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
 
     user_role = user.role.value if hasattr(user.role, 'value') else user.role
@@ -165,11 +190,26 @@ def update_problem(db: Session, owner: User, problem_id: uuid.UUID, req: Problem
         raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
     if p.owner_id != owner.id:
         raise HTTPException(status_code=403, detail=_error("PROBLEM_FORBIDDEN", "Not your problem"))
+    assert_not_deleted(p)
+    assert_problem_mutable(db, problem_id)   # REQ-PROB-004
     update_data = req.model_dump(exclude_none=True)
     return repo.update_problem(db, p, **update_data)
 
-def list_problems(db: Session, owner: User, skip: int, limit: int):
-    return repo.get_problems_by_owner(db, owner.id, skip=skip, limit=limit)
+def delete_problem(db: Session, owner: User, problem_id: uuid.UUID):
+    """REQ-PROB-005, docs/38 D5: soft delete; sessions, submissions and trace stay intact."""
+    p = repo.get_problem_by_id(db, problem_id)
+    if not p:
+        raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
+    if p.owner_id != owner.id:
+        raise HTTPException(status_code=403, detail=_error("PROBLEM_FORBIDDEN", "Not your problem"))
+    assert_not_deleted(p)
+    assert_problem_mutable(db, problem_id)
+    return repo.update_problem(db, p, deleted_at=_now_utc())
+
+def list_problems(db: Session, owner: User, skip: int, limit: int,
+                  difficulty: Optional[str] = None, language: Optional[str] = None, visibility: Optional[str] = None):
+    return repo.get_problems_by_owner(db, owner.id, skip=skip, limit=limit,
+                                      difficulty=difficulty, language=language, visibility=visibility)
 
 def list_public_problems(db: Session, skip: int, limit: int):
     return repo.get_public_problems(db, skip=skip, limit=limit)
@@ -180,6 +220,7 @@ def publish_to_class(db: Session, owner: User, problem_id: uuid.UUID, req: Publi
         raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
     if p.owner_id != owner.id:
         raise HTTPException(status_code=403, detail=_error("PROBLEM_FORBIDDEN", "Not your problem"))
+    assert_not_deleted(p)
 
     cls = repo.get_class_by_id(db, req.class_id)
     if not cls:
@@ -250,6 +291,7 @@ def attach_problem(db: Session, owner: User, exam_id: uuid.UUID, req: AttachProb
         raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
     if p.owner_id != owner.id:
         raise HTTPException(status_code=403, detail=_error("PROBLEM_FORBIDDEN", "Not your problem"))
+    assert_not_deleted(p)
 
     existing = repo.get_exam_problem(db, exam_id, req.problem_id)
     if existing:
@@ -363,7 +405,7 @@ def start_practice_session(db: Session, student: User, req: StartPracticeSession
         )
 
     p = repo.get_problem_by_id(db, req.problem_id)
-    if not p:
+    if not p or p.deleted_at is not None:
         raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
 
     vis = p.visibility if isinstance(p.visibility, str) else p.visibility.value

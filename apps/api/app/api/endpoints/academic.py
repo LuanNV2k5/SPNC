@@ -13,7 +13,7 @@ Covers:
     - Full authorization matrix per PROJECT_RULES / RBAC_MATRIX
 """
 import uuid
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -25,6 +25,7 @@ from app.services import academic as svc
 from app.schemas.academic import (
     # Class
     ClassCreateRequest, ClassUpdateRequest, ClassResponse, ClassListResponse,
+    StudentClassListResponse, JoinClassRequest,
     # ClassMembership
     EnrollRequest, MemberResponse, MemberListResponse,
     # Problem
@@ -180,7 +181,7 @@ def remove_student(
 
 @router.get(
     "/my/classes",
-    response_model=ClassListResponse,
+    response_model=StudentClassListResponse,
     tags=["classes"],
     summary="[P05-C08] List my enrolled classes (Student)",
 )
@@ -193,6 +194,41 @@ def student_list_classes(
     page, size, skip = _paginate(page, size)
     items, total = svc.list_student_classes(db, student=current_user, skip=skip, limit=size)
     return {"items": items, "total": total, "page": page, "size": size}
+
+
+@router.post(
+    "/my/classes/join",
+    response_model=MemberResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["classes"],
+    summary="[P12-C01] Join a class with its invite code (Student)",
+)
+def join_class(
+    req: JoinClassRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    m = svc.join_class(db, student=current_user, invite_code=req.invite_code)
+    db.commit()
+    db.refresh(m)
+    return m
+
+
+@router.post(
+    "/classes/{class_id}/invite-code/rotate",
+    response_model=ClassResponse,
+    tags=["classes"],
+    summary="[P12-C02] Replace the class invite code (Teacher owner)",
+)
+def rotate_invite_code(
+    class_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    cls = svc.rotate_invite_code(db, owner=current_user, class_id=class_id)
+    db.commit()
+    db.refresh(cls)
+    return cls
 
 
 # ============================================================
@@ -226,11 +262,15 @@ def create_problem(
 def list_problems(
     page: int = Query(1, ge=1),
     size: int = Query(50, ge=1, le=100),
+    difficulty: Optional[Literal["EASY", "MEDIUM", "HARD"]] = Query(None),
+    language: Optional[Literal["CPP17", "PYTHON3"]] = Query(None),
+    visibility: Optional[Literal["PRIVATE", "CLASS", "PUBLIC"]] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_teacher),
 ):
     page, size, skip = _paginate(page, size)
-    items, total = svc.list_problems(db, owner=current_user, skip=skip, limit=size)
+    items, total = svc.list_problems(db, owner=current_user, skip=skip, limit=size,
+                                     difficulty=difficulty, language=language, visibility=visibility)
     return {"items": items, "total": total, "page": page, "size": size}
 
 
@@ -264,6 +304,21 @@ def update_problem(
     db.commit()
     db.refresh(p)
     return p
+
+
+@router.delete(
+    "/problems/{problem_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["problems"],
+    summary="[P12-P01] Delete problem (soft; Teacher owner; not while in a scheduled/ongoing exam)",
+)
+def delete_problem(
+    problem_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    svc.delete_problem(db, owner=current_user, problem_id=problem_id)
+    db.commit()
 
 
 @router.get(

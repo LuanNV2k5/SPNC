@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -8,6 +9,15 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from app.db.base import Base, TimestampMixin
 
+# docs/38 D1: 8 characters, no 0/O/1/I/L
+INVITE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+INVITE_LENGTH = 8
+
+
+def generate_invite_code() -> str:
+    return "".join(secrets.choice(INVITE_ALPHABET) for _ in range(INVITE_LENGTH))
+
+
 class Class(Base, TimestampMixin):
     __tablename__ = "classes"
 
@@ -15,6 +25,8 @@ class Class(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255))
     academic_year: Mapped[str] = mapped_column(String(50))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    # REQ-CLASS-001; shown to the owner only
+    invite_code: Mapped[str] = mapped_column(String(16), unique=True, default=generate_invite_code)
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True)
 

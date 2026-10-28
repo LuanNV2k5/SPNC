@@ -171,19 +171,37 @@ def test_samples_require_problem_access(db, world):
     assert client.get(f"/api/v1/problems/{private}/samples", headers=w["h_stu"]).status_code == 403
 
 
-def test_edits_blocked_while_exam_running(db, world):
+def test_edits_blocked_while_exam_scheduled_or_ongoing(db, world):
+    """docs/38 D4 (DCR SPNC_PROBLEM_LOCK_SCOPE): frozen while a SCHEDULED/ONGOING exam uses the problem."""
     w = world
     tc_id = _add(w).json()["id"]
     now = datetime.now(timezone.utc)
-    eid = client.post("/api/v1/exams", json={"title": "E", "start_time": (now - timedelta(minutes=5)).isoformat(),
-                                             "end_time": (now + timedelta(hours=1)).isoformat()},
+    eid = client.post("/api/v1/exams", json={"title": "E", "start_time": (now + timedelta(hours=1)).isoformat(),
+                                             "end_time": (now + timedelta(hours=2)).isoformat()},
                       headers=w["h_owner"]).json()["id"]
     assert client.post(f"/api/v1/exams/{eid}/problems", json={"problem_id": w["pid"], "order_index": 1},
                        headers=w["h_owner"]).status_code in (200, 201)
-    for resp in (
-        _add(w),
-        client.patch(_url(w, f"/{tc_id}"), json={"score_weight": 1}, headers=w["h_owner"]),
-        client.delete(_url(w, f"/{tc_id}"), headers=w["h_owner"]),
-    ):
-        assert resp.status_code == 409
-        assert resp.json()["error_code"] == "PROBLEM_IN_ONGOING_EXAM"
+
+    def attempts():
+        return (
+            _add(w),
+            client.patch(_url(w, f"/{tc_id}"), json={"score_weight": 1}, headers=w["h_owner"]),
+            client.delete(_url(w, f"/{tc_id}"), headers=w["h_owner"]),
+        )
+
+    from app.models.exam import Exam
+    import uuid as _uuid
+    for status in ("SCHEDULED", "ONGOING"):
+        exam = db.get(Exam, _uuid.UUID(eid))
+        exam.status = status
+        db.commit()
+        for resp in attempts():
+            assert resp.status_code == 409
+            assert resp.json()["error_code"] == "PROBLEM_IN_ACTIVE_EXAM"
+
+    # DRAFT / ENDED / CANCELLED do not freeze the problem
+    for status in ("ENDED", "CANCELLED", "DRAFT"):
+        exam = db.get(Exam, _uuid.UUID(eid))
+        exam.status = status
+        db.commit()
+        assert client.patch(_url(w, f"/{tc_id}"), json={"score_weight": 2}, headers=w["h_owner"]).status_code == 200

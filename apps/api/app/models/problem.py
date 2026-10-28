@@ -1,8 +1,9 @@
 import enum
 import uuid
+from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import String, Boolean, ForeignKey, Integer, UniqueConstraint, CheckConstraint
+from sqlalchemy import String, Boolean, ForeignKey, Integer, UniqueConstraint, CheckConstraint, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
@@ -12,6 +13,11 @@ class ProblemVisibility(str, enum.Enum):
     PRIVATE = "PRIVATE"
     CLASS = "CLASS"
     PUBLIC = "PUBLIC"
+
+class ProblemDifficulty(str, enum.Enum):
+    EASY = "EASY"
+    MEDIUM = "MEDIUM"
+    HARD = "HARD"
 
 class SupportedLanguage(str, enum.Enum):
     CPP17 = "CPP17"
@@ -23,6 +29,13 @@ class Problem(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str] = mapped_column(String)
+    # REQ-PROB-001 statement fields (docs/38 12A)
+    constraints: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    input_format: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    output_format: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    difficulty: Mapped[Optional[ProblemDifficulty]] = mapped_column(String(10), nullable=True)
+    # docs/38 D5: soft delete keeps history (sessions, submissions reference problems)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True)
     visibility: Mapped[ProblemVisibility] = mapped_column(String(20), default=ProblemVisibility.PRIVATE, index=True)

@@ -29,7 +29,8 @@ class ClassUpdateRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
-class ClassResponse(BaseModel):
+class StudentClassResponse(BaseModel):
+    """Class as a student sees it: never carries the invite code (docs/38 §5)."""
     id: uuid.UUID
     name: str
     academic_year: str
@@ -41,8 +42,22 @@ class ClassResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ClassResponse(StudentClassResponse):
+    invite_code: str   # owner only (REQ-CLASS-001)
+
+
 class ClassListResponse(PaginatedResponse):
     items: List[ClassResponse]
+
+
+class StudentClassListResponse(PaginatedResponse):
+    items: List[StudentClassResponse]
+
+
+class JoinClassRequest(BaseModel):
+    invite_code: str = Field(..., min_length=1, max_length=16)
+
+    model_config = ConfigDict(extra="forbid")
 
 
 # ---------------------------------------------------------------------------
@@ -69,9 +84,22 @@ class MemberListResponse(PaginatedResponse):
 # ---------------------------------------------------------------------------
 # Problem
 # ---------------------------------------------------------------------------
+DIFFICULTIES = ("EASY", "MEDIUM", "HARD")
+
+
+def _check_difficulty(v: Optional[str]) -> Optional[str]:
+    if v is not None and v not in DIFFICULTIES:
+        raise ValueError("difficulty must be EASY, MEDIUM, or HARD")
+    return v
+
+
 class ProblemCreateRequest(BaseModel):
     title: str
     description: str
+    constraints: Optional[str] = None
+    input_format: Optional[str] = None
+    output_format: Optional[str] = None
+    difficulty: Optional[str] = None
     visibility: str = "PRIVATE"
     time_limit_ms: int = 1000
     memory_limit_mb: int = 256
@@ -92,10 +120,19 @@ class ProblemCreateRequest(BaseModel):
                 raise ValueError(f"Unsupported language: {lang}")
         return v
 
+    @field_validator("difficulty")
+    @classmethod
+    def validate_difficulty(cls, v: Optional[str]) -> Optional[str]:
+        return _check_difficulty(v)
+
 
 class ProblemUpdateRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    constraints: Optional[str] = None
+    input_format: Optional[str] = None
+    output_format: Optional[str] = None
+    difficulty: Optional[str] = None
     visibility: Optional[str] = None
     time_limit_ms: Optional[int] = None
     memory_limit_mb: Optional[int] = None
@@ -108,11 +145,21 @@ class ProblemUpdateRequest(BaseModel):
             raise ValueError("visibility must be PRIVATE, CLASS, or PUBLIC")
         return v
 
+    @field_validator("difficulty")
+    @classmethod
+    def validate_difficulty(cls, v: Optional[str]) -> Optional[str]:
+        return _check_difficulty(v)
+
 
 class ProblemResponse(BaseModel):
     id: uuid.UUID
     title: str
     description: str
+    constraints: Optional[str] = None
+    input_format: Optional[str] = None
+    output_format: Optional[str] = None
+    difficulty: Optional[str] = None
+    deleted_at: Optional[datetime] = None
     visibility: str
     owner_id: uuid.UUID
     time_limit_ms: int
