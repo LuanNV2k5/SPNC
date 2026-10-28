@@ -306,6 +306,14 @@ Mỗi OQ gồm:
 
 ---
 
+### OQ-26 — OPEN | BLOCKING_DEPLOYMENT
+
+**Question:** Production isolation of the judge zone (docs/10 §2): how does the judge worker reach a container runtime without host-root-equivalent access (rootless Docker, dedicated judge host/VM, gVisor/Kata, remote Docker over TLS)?
+**Current assumption:** Demo/dev compose mounts the host Docker socket into the `worker` container (docs/37 D3); not production-grade.
+**Owner:** Tech Lead / Security Stakeholder | **Status:** OPEN
+
+---
+
 ### OQ-25 — OUT_OF_SCOPE (V1)
 
 **Question:** Forgot password / self-service password recovery?
@@ -336,4 +344,5 @@ Mỗi OQ gồm:
 |---------------|--------|
 | BLOCKING_IMPLEMENTATION | OQ-01, 02, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 15, 16, 23, 24 |
 | NON_BLOCKING_V1 | OQ-03 |
+| BLOCKING_DEPLOYMENT | OQ-26 |
 | BLOCKING_ARCHITECTURE | **None remaining** ✓ |

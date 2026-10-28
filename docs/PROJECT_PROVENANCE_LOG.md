@@ -342,3 +342,23 @@ Change:
 
 Reason:
 Phase 04 allowed ADMIN to cancel ONGOING exams. That contradicts OQ-23's current assumption and `00_SCOPE.md` NG12.
+
+---
+
+## Decision: Phase 11 Shared Storage & Compose Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve all". All recommendations D1–D6 in `docs/37_SHARED_STORAGE_AND_COMPOSE.md` §6 are approved without overrides.
+
+Approved Decisions (summary):
+D1 `minio` client library; D2 `STORAGE_BACKEND=memory|s3`, default memory; D3 host Docker socket mounted into the worker container for the demo/dev stack only, production isolation tracked as OQ-26; D4 first admin via CLI bootstrap, no default credentials; D5 `websockets` dependency; D6 upload failure → 503 `STORAGE_UNAVAILABLE`.
+
+Scope note:
+Implements the already-approved architecture (docs/07, docs/10, ADR-007). No requirement, endpoint contract or schema change.
+
