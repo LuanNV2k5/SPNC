@@ -60,7 +60,7 @@ def test_bx_scratchpad_exclusion(db_session, setup_user_and_session):
     db_session.commit()
     
     fp = "fp1"
-    rev = ScratchpadRevision(session_id=session.id, revision_sequence=1, canonical_fingerprint=fp, content="def x():\\n  pass\\n", client_timestamp=datetime.now(timezone.utc), server_timestamp=datetime.now(timezone.utc))
+    rev = ScratchpadRevision(session_id=session.id, revision_sequence=1, canonical_fingerprint=fp, content="def x():\n  pass\n", client_timestamp=datetime.now(timezone.utc), server_timestamp=datetime.now(timezone.utc))
     db_session.add(rev)
     db_session.commit()
     

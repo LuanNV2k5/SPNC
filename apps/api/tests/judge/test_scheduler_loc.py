@@ -106,7 +106,7 @@ def _setup_cohort(db, student_user, active_session):
         db.commit()
         
         # Cohort has median 10 lines
-        shash, obj_key = storage_adapter.upload_code_snapshot(str(s.id), 1, "line\\n" * 10)
+        shash, obj_key = storage_adapter.upload_code_snapshot(str(s.id), 1, "line\n" * 10)
         
         snap = CodeSnapshot(reason='RUN', language='PYTHON3', source_hash=shash, line_count=10, 
             session_id=s.id,
@@ -120,7 +120,7 @@ def test_c_loc_01_02_qualifying_and_repeat(db: Session, student_user, active_ses
     _setup_cohort(db, student_user, active_session)
     
     # Student has 30 lines > 10 * 2.0 (dev_policy)
-    shash, obj_key = storage_adapter.upload_code_snapshot(str(active_session.id), 1, "line\\n" * 30)
+    shash, obj_key = storage_adapter.upload_code_snapshot(str(active_session.id), 1, "line\n" * 30)
     snap = CodeSnapshot(reason='RUN', language='PYTHON3', source_hash=shash, line_count=30, 
         session_id=active_session.id,
         object_key=obj_key,
@@ -148,7 +148,7 @@ def test_c_loc_03_small_cohort(db: Session, student_user, active_session):
     db.add(ClassMembership(student_id=student_user.id, class_id=cls.id, is_active=True))
     db.commit()
     
-    shash, obj_key = storage_adapter.upload_code_snapshot(str(active_session.id), 1, "line\\n" * 30)
+    shash, obj_key = storage_adapter.upload_code_snapshot(str(active_session.id), 1, "line\n" * 30)
     snap = CodeSnapshot(reason='RUN', language='PYTHON3', source_hash=shash, line_count=30, 
         session_id=active_session.id,
         object_key=obj_key,
@@ -166,7 +166,7 @@ def test_c_loc_04_non_outlier(db: Session, student_user, active_session):
     _setup_cohort(db, student_user, active_session)
     
     # Student has 15 lines <= 10 * 2.0
-    shash, obj_key = storage_adapter.upload_code_snapshot(str(active_session.id), 1, "line\\n" * 15)
+    shash, obj_key = storage_adapter.upload_code_snapshot(str(active_session.id), 1, "line\n" * 15)
     snap = CodeSnapshot(reason='RUN', language='PYTHON3', source_hash=shash, line_count=15, 
         session_id=active_session.id,
         object_key=obj_key,
@@ -183,7 +183,7 @@ def test_c_loc_04_non_outlier(db: Session, student_user, active_session):
 def test_c_loc_05_06_changed_evidence_and_aggregate_only(db: Session, student_user, active_session):
     _setup_cohort(db, student_user, active_session)
     
-    shash, obj_key = storage_adapter.upload_code_snapshot(str(active_session.id), 1, "line\\n" * 30)
+    shash, obj_key = storage_adapter.upload_code_snapshot(str(active_session.id), 1, "line\n" * 30)
     snap1 = CodeSnapshot(reason='RUN', language='PYTHON3', source_hash=shash, line_count=30, 
         session_id=active_session.id,
         object_key=obj_key,
@@ -199,7 +199,7 @@ def test_c_loc_05_06_changed_evidence_and_aggregate_only(db: Session, student_us
     assert "cohort_median_loc" in signals[0].evidence
     
     # Genuine new evidence (new snapshot)
-    shash2, obj_key2 = storage_adapter.upload_code_snapshot(str(active_session.id), 2, "line\\n" * 35)
+    shash2, obj_key2 = storage_adapter.upload_code_snapshot(str(active_session.id), 2, "line\n" * 35)
     snap2 = CodeSnapshot(reason='RUN', language='PYTHON3', source_hash=shash2, line_count=35, 
         session_id=active_session.id,
         object_key=obj_key2,

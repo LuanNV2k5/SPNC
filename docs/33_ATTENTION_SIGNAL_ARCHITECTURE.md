@@ -18,6 +18,7 @@ Phase 08 establishes the autonomous backend **Attention Signal Engine** of the S
 - **Phase 08B (Signal Heuristic Algorithms):** Implemented (uncommitted candidate). Core evaluators in `apps/api/app/services/judge/signals.py` evaluate four authorized signal types strictly from historical `TraceEvent`, `Run`, and `CodeSnapshot` records. `ScratchpadRevision` is strictly excluded.
 - **Phase 08C (Scheduler & Materializer):** Implemented (uncommitted candidate). Polling entrypoint `apps/api/app/signal_scheduler.py` and batch materializer `apps/api/app/services/judge/materializer.py` provide bounded candidate scanning, error isolation, and PostgreSQL dialect `ON CONFLICT (dedup_key) DO NOTHING` idempotency.
 - **Phase 08 Verification State:** Verified in isolated QA execution (`spnc-postgres-phase08-qa` on PostgreSQL 16.15), passing 45 automated unit, algorithm, cycle, and concurrency tests.
+- **Phase 08D (Integration & Hardening):** Implemented (uncommitted candidate, 2026-10-28). Adds Alembic revision `c4819d7a2e10` (`trace_signal_outbox` table + `AFTER INSERT` trigger on `trace_events` + idempotent historical bootstrap), `process_outbox_cycle` in the materializer, `evaluate_historical_idle_gaps` in the evaluators, interruptible scheduler shutdown, non-null `rule_version` on all four evaluators, and canonical §1.8 evidence keys alongside legacy diagnostic keys. See §15 for the 08D change log.
 - **Independent Review Finding:** Independent review of the initial Phase 08D specification returned `FAIL` due to misattribution of `REQ-SIGNAL-001`, unpopulated `rule_version` entity column, missing `meaningful_event_before_id` in `IDLE_DETECTED` evidence, and unhandled historical inter-event gaps. This remediated specification formalizes the architectural baseline, functional gaps, and closure prerequisites.
 
 ---
@@ -55,8 +56,11 @@ graph TD
         API -->|Run Request| DB_Run[(PostgreSQL: runs)]
     end
 
+    DB_Trace -->|AFTER INSERT trigger, meaningful events only| DB_Outbox[(PostgreSQL: trace_signal_outbox)]
+
     subgraph Phase 08 Signal Engine
         Scheduler[Signal Scheduler Daemon: app/signal_scheduler.py] -->|Tick every 60s| Materializer[Materializer: app/services/judge/materializer.py]
+        Materializer -->|1. process_outbox_cycle: FOR NO KEY UPDATE SKIP LOCKED, contiguous prefix only| DB_Outbox
         Materializer -->|Bounded Scan| DB_Trace
         Materializer -->|Bounded Scan| DB_Run
         Materializer -->|Download Snapshots| Blob
@@ -81,10 +85,18 @@ graph TD
 
 The system implements exactly four authorized signal types in accordance with `docs/01_DOMAIN.md` §1.8 (V1 closed enum).
 
+> **08D implementation state:** every evaluator now sets `rule_version = settings.SIGNAL_RULE_VERSION` (`"1.0.0"`). Each evidence payload carries the canonical §1.8 keys (as amended by the approved DCRs) **plus** the legacy Phase 08 diagnostic keys. In the subsections below, the "Current Candidate Implementation Schema" blocks show only the legacy subset as it was before 08D. The "Authoritative Contract" lines describe the canonical keys that are now emitted.
+>
+> **Line counting (08D fix):** `_count_loc`, `_code_change_ratio` and `_normalize_error` split snapshot content with `str.splitlines()`, so LF and CRLF content are both handled. Before 08D they split on the literal two-character sequence `\n`. As a result, real multi-line code counted as one line: `LOC_ANOMALY` could not trigger on real snapshots, and the `REPEATED_FAILURE` change ratio was all-or-nothing. Pinned by `test_loc_and_change_ratio_use_real_line_breaks`.
+
 ### 4.1 `IDLE_DETECTED`
 - **Definition:** Detects when an active student session exhibits no meaningful activity for a duration exceeding the configured threshold.
-- **Meaningful Event Set:** `TraceEventType.EDITOR_CHANGED`, `TraceEventType.RUN_REQUESTED`, `TraceEventType.SUBMISSION_CREATED`, `TraceEventType.SESSION_CHECKPOINT`.
-- **Precondition:** `session.status == SessionStatus.ACTIVE`.
+- **Meaningful Event Set:** `TraceEventType.EDITOR_CHANGED`, `TraceEventType.RUN_REQUESTED`, `TraceEventType.SUBMISSION_CREATED`. This matches `REQ-IDLE-001` (`EDITOR_CHANGE`, `RUN_EXECUTED`, `SUBMISSION_MADE`). `SESSION_CHECKPOINT` was removed in 08D: it is client-generated and does not prove student activity, so it must not reset inactivity. Pinned by `test_historical_idle_session_checkpoint_does_not_reset_inactivity`. The `trg_trace_events_enqueue_outbox` trigger uses the same three types.
+- **Two Detection Modes (08D):**
+  1. *Active tail* (`evaluate_idle_detected`, via `run_cycle`): ongoing inactivity of an `ACTIVE` session, measured up to the evaluation time.
+  2. *Closed historical gap* (`evaluate_historical_idle_gaps`, via `process_outbox_cycle`): the gap between consecutive meaningful events (or `opened_at` and the first one), for sessions in any status. It is evaluated only up to the session's highest contiguous `sequence_number`, so a missing sequence defers evaluation instead of creating a false gap.
+- **Tail/Historical Overlap Policy:** both modes key the first window as `IDLE:{session.id}:{int(start)}:W1`. If the active tail already materialized an episode, the later closing event dedups onto that row and the stored evidence stays exactly as detected (evidence immutability, DCR SPNC_LOC_EVIDENCE_CONTRACT). One idle episode produces one W1 alert. Pinned by `test_c_idle_outbox_tail_historical_overlap_one_alert`. The active tail may add further `W2..Wn` rows for long episodes, per the windowed key below.
+- **Precondition (active tail only):** `session.status == SessionStatus.ACTIVE`.
 - **Baseline Timestamp:** The `server_timestamp` of the most recent meaningful `TraceEvent`. If no events exist, falls back to `session.opened_at`.
 - **Threshold Rule:** `idle_seconds >= settings.SIGNAL_IDLE_THRESHOLD_SECONDS` (default: 300s / 5 minutes).
 - **Session Mutation Invariant:** `CodingSession.status` is **never** altered (`REQ-SESSION-005`). IDLE does not transition sessions to `ABANDONED`.
@@ -102,7 +114,7 @@ The system implements exactly four authorized signal types in accordance with `d
     "last_meaningful_event_type": "EDITOR_CHANGED"
   }
   ```
-  *(Defect Note: `meaningful_event_before_id` is missing in current implementation; see GAP-08D-04).*
+  *(Resolved in 08D: both IDLE modes now emit `start_time`, `end_time`, `duration_seconds`, `meaningful_event_before_id` and `threshold_used`. Historical-gap evidence also adds `gap_closed`, `closing_event_id` and `closing_event_type`.)*
 - **Remediated Target Schema:**
   ```json
   {
@@ -292,14 +304,14 @@ This matrix establishes the precise mapping of all authoritative requirements re
 
 | Requirement ID | Authoritative Source & Line | Requirement Summary | Status | Detailed Audit Analysis & Implementation State |
 |---|---|---|---|---|
-| **REQ-IDLE-001** | `docs/03_REQUIREMENTS.md:128` | Calculate idle interval between meaningful events (`EDITOR_CHANGE`, `RUN_EXECUTED`, `SUBMISSION_MADE`) | **PARTIAL** | Evaluates ongoing inactivity for active sessions `(evaluated_at - last_meaningful_at)` using Phase 06 enums (`EDITOR_CHANGED`, `RUN_REQUESTED`, `SUBMISSION_CREATED`, `SESSION_CHECKPOINT`). Does not evaluate historical inter-event gaps between past events in completed sessions (see GAP-08D-03). |
-| **REQ-IDLE-002** | `docs/03_REQUIREMENTS.md:129` | Create `IDLE_DETECTED` signal when gap >= threshold; evidence requires `{start_time, end_time, duration_seconds, meaningful_event_before_id, threshold_used}` | **PARTIAL** | Signal creation logic is verified. Evidence schema currently omits `meaningful_event_before_id` and uses renamed fields in candidate code (`signals.py:58-65`). Must be remediated in Phase 08D (see GAP-08D-04). |
+| **REQ-IDLE-001** | `docs/03_REQUIREMENTS.md:128` | Calculate idle interval between meaningful events (`EDITOR_CHANGE`, `RUN_EXECUTED`, `SUBMISSION_MADE`) | **IMPLEMENTED (08D)** | Active-tail inactivity (`evaluate_idle_detected`) plus closed inter-event gaps via the transactional outbox (`evaluate_historical_idle_gaps`), both using Phase 06 enums `EDITOR_CHANGED`, `RUN_REQUESTED`, `SUBMISSION_CREATED`. `SESSION_CHECKPOINT` is excluded (§4.1). Owner ratification of GAP-08D-03 is still pending. |
+| **REQ-IDLE-002** | `docs/03_REQUIREMENTS.md:129` | Create `IDLE_DETECTED` signal when gap >= threshold; evidence requires `{start_time, end_time, duration_seconds, meaningful_event_before_id, threshold_used}` | **IMPLEMENTED (08D)** | Both IDLE modes emit all five canonical keys, including `meaningful_event_before_id` (null when the gap starts at `opened_at`). Legacy keys are kept alongside them. |
 | **REQ-IDLE-003** | `docs/03_REQUIREMENTS.md:130` | Factual wording only; no negative or judgmental student labels | **VERIFIED** | Code, evidence JSON, and logs contain zero judgmental terms. Aligns with Rule #20. |
 | **REQ-SIGNAL-001**| `docs/03_REQUIREMENTS.md:136` | Calculate `Session.final_loc` on session completion; `SESSION_ENDED` event must contain `final_loc` | **MISSING** | `CodingSession` model lacks `final_loc` column. Neither Phase 06/07 session termination nor Phase 08 signal engine implements final LOC calculation. Was misattributed to `FAST_FIRST_CODE` in early drafts (see GAP-08D-01). |
-| **REQ-SIGNAL-002**| `docs/03_REQUIREMENTS.md:137` | `LOC_ANOMALY` must use relative threshold, no hardcoded absolute threshold | **PARTIAL** | Heuristic enforces relative cohort median deviation (no fixed limit). Evidence keys diverge from domain text (`student_loc` vs `final_loc`, `cohort_median_loc` vs `context_median_loc`, `relative_deviation` vs `delta`) (see GAP-08D-04). |
-| **REQ-SIGNAL-003**| `docs/03_REQUIREMENTS.md:138` | Non-empty, verifiable evidence JSON per §1.8 schemas | **PARTIAL** | Evidence is non-empty and verifiable. Schema field names diverge from §1.8 across all 4 signal types (see GAP-08D-04). |
+| **REQ-SIGNAL-002**| `docs/03_REQUIREMENTS.md:137` | `LOC_ANOMALY` must use relative threshold, no hardcoded absolute threshold | **IMPLEMENTED (08D)** | Relative cohort median deviation only (no fixed limit). Canonical keys follow DCR SPNC_LOC_EVIDENCE_CONTRACT. LOC counting fixed to use real line breaks (§4 note). `final_loc` stays null until GAP-08D-01 is decided. |
+| **REQ-SIGNAL-003**| `docs/03_REQUIREMENTS.md:138` | Non-empty, verifiable evidence JSON per §1.8 schemas | **IMPLEMENTED (08D)** | All four evaluators emit the canonical §1.8 keys (as amended by the approved RF and LOC DCRs) plus legacy diagnostic keys (dual-key, see GAP-08D-04). |
 | **REQ-SIGNAL-004**| `docs/03_REQUIREMENTS.md:139` | Strictly objective; never conclude cheating or lack of comprehension | **VERIFIED** | Enforced across all heuristics, logs, and database payloads. Aligns with Rule #20. |
-| **REQ-SIGNAL-005**| `docs/03_REQUIREMENTS.md:140` | `AttentionSignal.rule_version` non-null for traceability | **MISSING** | `rule_version` is a dedicated column on `AttentionSignal`. Evaluators in `signals.py` leave it unassigned, persisting `NULL` in PostgreSQL (see GAP-08D-02). |
+| **REQ-SIGNAL-005**| `docs/03_REQUIREMENTS.md:140` | `AttentionSignal.rule_version` non-null for traceability | **IMPLEMENTED (08D)** | All five evaluator paths (including historical IDLE) set `rule_version = settings.SIGNAL_RULE_VERSION` (`"1.0.0"`). |
 | **REQ-SESSION-005**| `docs/03_REQUIREMENTS.md:122` | IDLE signal generation does not alter `CodingSession.status` | **VERIFIED** | Evaluators act strictly as observers without mutating session lifecycle. |
 | **RBAC Policy** | `docs/05_RBAC_MATRIX.md:197` | Signal creation restricted strictly to internal `SYSTEM` daemon | **VERIFIED** | All external roles (ADMIN, TEACHER, STUDENT) have DENY on signal creation/modification. |
 | **DBI-014** | `docs/16_DATABASE_INVARIANTS.md:18` | `SignalType` closed enum | **VERIFIED** | Enforced by Python Enum and PostgreSQL column length constraint. |
@@ -332,7 +344,8 @@ PROPOSED_REMEDIATION: Update evaluate_idle_detected, evaluate_fast_first_code, e
 REGRESSION_TEST_REQUIRED: test_signals_domain.py, test_signals_algorithms.py, test_scheduler_cycle.py.
 MIGRATION_REQUIRED: NO (column already exists).
 OPEN_DECISION: Confirm initial rule_version semantic versioning scheme (proposal: "1.0.0").
-STATUS: PROPOSED_FOR_08D
+RESOLUTION_08D: Implemented via settings.SIGNAL_RULE_VERSION = "1.0.0" on all evaluators.
+STATUS: IMPLEMENTED
 ```
 
 ```
@@ -344,7 +357,8 @@ PROPOSED_REMEDIATION: Clarify whether V1 Attention Signal Engine is intentionall
 REGRESSION_TEST_REQUIRED: test_scheduler_idle.py, test_signals_algorithms.py.
 MIGRATION_REQUIRED: NO.
 OPEN_DECISION: Formalize whether active-session ongoing idle detection satisfies Phase 08 V1 scope, leaving historical retrospective analysis to Phase 09 Teacher Timeline rendering.
-STATUS: OPEN_DECISION
+RESOLUTION_08D: Historical gap scanning implemented through trace_signal_outbox (migration c4819d7a2e10) + process_outbox_cycle + evaluate_historical_idle_gaps. Properties: per-session SKIP LOCKED claims, contiguous-prefix gating, bounded chunks (500), atomic materialize+delete, tail/historical W1 dedup overlap.
+STATUS: IMPLEMENTED — PENDING PROJECT OWNER RATIFICATION (no DCR recorded in PROJECT_PROVENANCE_LOG.md yet)
 ```
 
 ```
@@ -362,7 +376,8 @@ PROPOSED_REMEDIATION:
 REGRESSION_TEST_REQUIRED: test_signals_domain.py, test_signals_algorithms.py.
 MIGRATION_REQUIRED: NO (JSONB payload).
 OPEN_DECISION: Formally adopt implementation field names as the V1 production standard and update docs/01_DOMAIN.md §1.8 accordingly.
-STATUS: PROPOSED_FOR_08D
+RESOLUTION_08D: Dual-key compatibility chosen (remediation option 2, first alternative). Every payload carries the canonical §1.8 keys plus legacy keys. Items 1 and 4 are resolved in code; items 2 and 3 are resolved by the approved DCRs. docs/01_DOMAIN.md is unchanged.
+STATUS: IMPLEMENTED
 ```
 
 ---
@@ -383,7 +398,7 @@ To achieve `PASS` on Phase 08D functional verification, the following criteria m
 | **AC-08D-08** | Idempotency | Re-executing cycles against identical sessions produces 0 duplicate rows. | `test_scheduler_cycle.py` |
 | **AC-08D-09** | Concurrency | Barrier-synchronized concurrent cycle workers produce exactly 1 signal. | `test_scheduler_concurrency.py` |
 | **AC-08D-10** | Error Isolation | Exceptions in single evaluators do not crash cycle or block other candidates. | `test_scheduler_cycle.py` |
-| **AC-08D-11** | Clean Migration | Fresh PostgreSQL migrates cleanly from base to `51377aaa532a`. | `alembic upgrade head` |
+| **AC-08D-11** | Clean Migration | Fresh PostgreSQL migrates cleanly from base to head `c4819d7a2e10`, and downgrades back to `51377aaa532a`. | `alembic upgrade head` |
 | **AC-08D-12** | E2E Integration | Complete multi-step session lifecycle triggers all 4 signals end-to-end. | `test_signals_e2e.py` |
 | **AC-08D-13** | Regression | Full Phase 08 suite and Phase 06/07 regressions pass on isolated QA database. | Pytest test runner |
 | **AC-08D-14** | Scope Fence | 0 Teacher Observation API routes, 0 UI files, 0 student endpoints added. | `git diff` against baseline |
@@ -437,3 +452,35 @@ These procedural actions govern final baseline locking and must not be conflated
 3. **Historical Inter-Event Idle Gaps:**
    - *Question:* Does active-session ongoing inactivity monitoring satisfy `REQ-IDLE-001` for Phase 08 V1?
    - *Architectural Recommendation:* Yes. In-progress idle alerting is the primary operational purpose of the periodic scheduler daemon. Retrospective trace event gap visualization is naturally performed on-demand by Phase 09 Teacher Timeline queries.
+
+   - *08D status:* implemented in code (§4.1, GAP-08D-03); still awaiting Project Owner ratification.
+
+---
+
+## 15. Phase 08D Change Log & Verification Record (2026-10-28)
+
+### 15.1 Changes
+| Area | File | Change |
+|---|---|---|
+| Migration | `apps/api/alembic/versions/c4819d7a2e10_phase08d_trace_signal_outbox.py` | New table `trace_signal_outbox`, `AFTER INSERT` trigger on `trace_events` (meaningful types only), idempotent bootstrap of existing events. Downgrade drops trigger, function, indexes and table. |
+| Model | `apps/api/app/models/observation.py`, `models/__init__.py` | `TraceSignalOutbox` model. |
+| Engine | `apps/api/app/services/judge/materializer.py` | `process_outbox_cycle`. `materialize_signal(commit=False)` lets the outbox cycle commit atomically. |
+| Engine | `apps/api/app/services/judge/signals.py` | `evaluate_historical_idle_gaps`. `SESSION_CHECKPOINT` removed from the meaningful set. `splitlines()` line-counting fix. |
+| Daemon | `apps/api/app/signal_scheduler.py` | Outbox step before `run_cycle`. `threading.Event` interruptible wait. SIGINT/SIGTERM handlers. |
+| Tests | `tests/judge/test_signals_e2e.py`, `test_trace_outbox_schema.py`, `test_scheduler_idle.py`, `test_signals_algorithms.py`, `test_scheduler_loc.py`, `test_signals_cross.py` | Outbox, historical-gap and E2E coverage. Snapshot fixtures now use real line breaks. E2E asserts both IDLE modes (closed 400s gap + open tail). |
+| Hygiene | `apps/api/fix_*.py` (14 files), `apps/clean_phase08` worktree/gitlink | Removed. |
+
+No API routes, UI files or student endpoints were added (AC-08D-14: route diff vs `phase-07-judge-locked` is empty).
+
+### 15.2 Verification
+| Check | Environment | Result |
+|---|---|---|
+| AC-08D-11 migration | Fresh DB `spnc_phase08d_fresh`, PostgreSQL 16.15 | base → `c4819d7a2e10` OK; downgrade to `51377aaa532a` removes table + trigger; re-upgrade OK |
+| Phase 08 suite (`tests/judge/test_signals_*`, `test_scheduler_*`, `test_trace_outbox_schema`, `tests/db`) | same | **89 passed** |
+| Phase 03–07 regression (`tests/api/*`, `test_fencing`, `test_queue`, `test_adapters`, `test_sandbox_security`) | Disposable PostgreSQL 16 on :5432, each DB migrated to head; Redis; Docker sandbox | **262 passed** (58 + 27 + 90 + 15 + 16 + 3 + 10 + 6 + 24 + 13) |
+| AC-08D-04 ethics grep on `apps/api/app` | static | 0 hits |
+
+### 15.3 Known Limitations Carried Forward
+- `StorageAdapter` is in-memory per process. The scheduler daemon cannot read snapshots that the API process uploaded, so `LOC_ANOMALY` and `REPEATED_FAILURE` need a shared blob store (S3/MinIO) before production use.
+- `RunService.get_run` / `list_runs` allow any TEACHER, without class scoping (PROJECT_RULES #12). Track for Phase 09.
+- GAP-08D-01 (`final_loc`) remains OPEN_DECISION.

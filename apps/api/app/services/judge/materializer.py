@@ -3,27 +3,30 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_, delete
 from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import settings
 from app.models.session import CodingSession, SessionStatus
 from app.models.run_submit import Run
 from app.models.trace import CodeSnapshot
-from app.models.observation import AttentionSignal
+from app.models.observation import AttentionSignal, TraceSignalOutbox
+from app.repositories import trace as trace_repo
 from app.services.judge.signals import (
     evaluate_idle_detected,
     evaluate_fast_first_code,
     evaluate_repeated_failure,
     evaluate_loc_anomaly,
+    evaluate_historical_idle_gaps,
 )
 
 logger = logging.getLogger(__name__)
 
-def materialize_signal(db: Session, signal: AttentionSignal) -> bool:
+def materialize_signal(db: Session, signal: AttentionSignal, commit: bool = True) -> bool:
     """
     Idempotent insert into AttentionSignal using PostgreSQL ON CONFLICT DO NOTHING.
     Returns True if a new row was inserted, False if it was deduped.
+    If commit is True, commits transaction; if False, flushes so caller controls atomicity.
     """
     from app.models.observation import SignalStatus
     import datetime
@@ -42,11 +45,17 @@ def materialize_signal(db: Session, signal: AttentionSignal) -> bool:
     
     try:
         result = db.execute(stmt)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return result.rowcount > 0
     except Exception as e:
-        db.rollback()
+        if commit:
+            db.rollback()
         logger.error(f"Failed to materialize signal {signal.dedup_key}: {e}")
+        if not commit:
+            raise
         return False
 
 def _process_active_sessions(db: Session, since_dt: datetime, batch_size: int, metrics: Dict[str, Any]):
@@ -148,6 +157,83 @@ def _process_loc_sessions(db: Session, since_dt: datetime, batch_size: int, metr
                 logger.error(f"Error evaluating LOC for session {session.id}: {e}")
                 
         offset += batch_size
+
+def process_outbox_cycle(db: Session, batch_sessions: int = 10, chunk_limit: int = 500) -> Dict[str, Any]:
+    """
+    Processes pending items from trace_signal_outbox in bounded chunks per session.
+    Enforces per-session locking (FOR NO KEY UPDATE SKIP LOCKED), causal contiguity,
+    atomic materialization, and outbox deletion within a single transaction per cycle.
+    """
+    metrics = {
+        "sessions_claimed": 0,
+        "outbox_processed": 0,
+        "outbox_deleted": 0,
+        "signals_materialized": 0,
+    }
+
+    try:
+        # 1. Claim sessions that have pending outbox rows
+        # FOR NO KEY UPDATE SKIP LOCKED prevents concurrent worker overlap without blocking live student trace ingestion
+        claim_stmt = (
+            select(CodingSession)
+            .where(CodingSession.id.in_(select(TraceSignalOutbox.session_id)))
+            .order_by(CodingSession.id.asc())
+            .with_for_update(key_share=True, skip_locked=True)
+            .limit(batch_sessions)
+        )
+        sessions = list(db.execute(claim_stmt).scalars().all())
+        if not sessions:
+            return metrics
+
+        metrics["sessions_claimed"] = len(sessions)
+
+        for session in sessions:
+            # 2. Check causal contiguity on full TraceEvent sequence
+            highest_contiguous, _ = trace_repo.get_trace_state(db, session.id)
+            if highest_contiguous < 1:
+                # Contiguity not established or sequence 1 missing; defer this session
+                continue
+
+            # 3. Fetch bounded chunk of outbox items up to highest_contiguous
+            outbox_stmt = (
+                select(TraceSignalOutbox)
+                .where(
+                    and_(
+                        TraceSignalOutbox.session_id == session.id,
+                        TraceSignalOutbox.sequence_number <= highest_contiguous
+                    )
+                )
+                .order_by(TraceSignalOutbox.sequence_number.asc())
+                .limit(chunk_limit)
+            )
+            outbox_chunk = list(db.execute(outbox_stmt).scalars().all())
+            if not outbox_chunk:
+                continue
+
+            metrics["outbox_processed"] += len(outbox_chunk)
+
+            # 4. Evaluate historical IDLE gaps for chunk items
+            signals = evaluate_historical_idle_gaps(session, outbox_chunk, db)
+
+            # 5. Materialize signals atomically (without committing transaction yet)
+            for sig in signals:
+                inserted = materialize_signal(db, sig, commit=False)
+                if inserted:
+                    metrics["signals_materialized"] += 1
+
+            # 6. Delete processed outbox items atomically
+            processed_ids = [item.id for item in outbox_chunk]
+            delete_stmt = delete(TraceSignalOutbox).where(TraceSignalOutbox.id.in_(processed_ids))
+            db.execute(delete_stmt)
+            metrics["outbox_deleted"] += len(processed_ids)
+
+        # 7. Commit transaction atomically
+        db.commit()
+        return metrics
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error processing outbox cycle: {e}")
+        raise
 
 def run_cycle(db: Session, since_dt: datetime) -> Dict[str, Any]:
     """

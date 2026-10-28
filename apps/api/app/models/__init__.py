@@ -6,7 +6,7 @@ from .exam import Exam, ExamStatus, ParticipationStatus, ExamProblem, ExamAssign
 from .session import CodingSession, SessionStatus, TerminationSource, PracticeAttempt
 from .trace import TraceEvent, TraceEventType, CodeSnapshot, SnapshotReason
 from .run_submit import Run, RunStatus, RunVerdict, Submission
-from .observation import AttentionSignal, SignalType, SignalStatus, TeacherAnnotation, PointTransaction
+from .observation import AttentionSignal, SignalType, SignalStatus, TeacherAnnotation, PointTransaction, TraceSignalOutbox
 
 # Ensure all models are loaded before Alembic reads Base.metadata
 __all__ = [
@@ -19,4 +19,5 @@ __all__ = [
     "TraceEvent", "TraceEventType", "CodeSnapshot", "SnapshotReason",
     "Run", "RunStatus", "RunVerdict", "Submission",
     "AttentionSignal", "SignalType", "SignalStatus", "TeacherAnnotation", "PointTransaction",
+    "TraceSignalOutbox",
 ]

@@ -16,7 +16,8 @@ from app.services.judge.signals import (
     evaluate_idle_detected,
     evaluate_fast_first_code,
     evaluate_repeated_failure,
-    evaluate_loc_anomaly
+    evaluate_loc_anomaly,
+    evaluate_historical_idle_gaps,
 )
 from app.core.config import settings
 from app.services.storage import storage_adapter
@@ -279,7 +280,7 @@ def test_fast_first_code_empty_session_boundary(db_session, setup_user_and_sessi
 # =======================
 def _create_snapshot(db_session, session, code, seq):
     _, obj_key = storage_adapter.upload_code_snapshot(str(session.id), seq, code)
-    snap = CodeSnapshot(session_id=session.id, reason="RUN", language="PYTHON3", source_hash="hash", object_key=obj_key, line_count=len(code.split("\\n")))
+    snap = CodeSnapshot(session_id=session.id, reason="RUN", language="PYTHON3", source_hash="hash", object_key=obj_key, line_count=len(code.split("\n")))
     db_session.add(snap)
     db_session.commit()
     return snap
@@ -301,15 +302,15 @@ def test_rf_qualifies(db_session, setup_user_and_session):
     _, _, session = setup_user_and_session
     
     # 3 failures, little code change
-    s1 = _create_snapshot(db_session, session, "def x():\\n  pass\\n", 1)
+    s1 = _create_snapshot(db_session, session, "def x():\n  pass\n", 1)
     r1 = Run(session_id=session.id, snapshot_id=s1.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=1)
     r1.testcase_results = {"compile_error_message": "Error on line 1"}
     
-    s2 = _create_snapshot(db_session, session, "def x():\\n  pass\\n  ", 2)
+    s2 = _create_snapshot(db_session, session, "def x():\n  pass\n  ", 2)
     r2 = Run(session_id=session.id, snapshot_id=s2.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=2)
     r2.testcase_results = {"compile_error_message": "Error on line 1"}
     
-    s3 = _create_snapshot(db_session, session, "def x():\\n  pass\\n   ", 3)
+    s3 = _create_snapshot(db_session, session, "def x():\n  pass\n   ", 3)
     r3 = Run(session_id=session.id, snapshot_id=s3.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=3)
     r3.testcase_results = {"compile_error_message": "Error on line 1"}
     
@@ -371,15 +372,15 @@ def test_rf_submission_entity_isolation(db_session, setup_user_and_session):
     assert sub_count_before == 1
 
     now = datetime.now(timezone.utc)
-    s1 = _create_snapshot(db_session, session, "def x():\\n  pass\\n", 2)
+    s1 = _create_snapshot(db_session, session, "def x():\n  pass\n", 2)
     r1 = Run(session_id=session.id, snapshot_id=s1.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=1, created_at=now - timedelta(seconds=20))
     r1.testcase_results = {"compile_error_message": "Error on line 1"}
     
-    s2 = _create_snapshot(db_session, session, "def x():\\n  pass\\n  ", 3)
+    s2 = _create_snapshot(db_session, session, "def x():\n  pass\n  ", 3)
     r2 = Run(session_id=session.id, snapshot_id=s2.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=2, created_at=now - timedelta(seconds=10))
     r2.testcase_results = {"compile_error_message": "Error on line 1"}
     
-    s3 = _create_snapshot(db_session, session, "def x():\\n  pass\\n   ", 4)
+    s3 = _create_snapshot(db_session, session, "def x():\n  pass\n   ", 4)
     r3 = Run(session_id=session.id, snapshot_id=s3.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=3, created_at=now)
     r3.testcase_results = {"compile_error_message": "Error on line 1"}
     
@@ -416,14 +417,14 @@ def test_rf_substantial_change(db_session, setup_user_and_session):
     # B-RF-03
     _, _, session = setup_user_and_session
     
-    s1 = _create_snapshot(db_session, session, "def x():\\n  pass\\n", 1)
+    s1 = _create_snapshot(db_session, session, "def x():\n  pass\n", 1)
     r1 = Run(session_id=session.id, snapshot_id=s1.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=1)
     
     # huge change
-    s2 = _create_snapshot(db_session, session, "def y():\\n  return 1\\ndef z():\\n  pass\\n", 2)
+    s2 = _create_snapshot(db_session, session, "def y():\n  return 1\ndef z():\n  pass\n", 2)
     r2 = Run(session_id=session.id, snapshot_id=s2.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=2)
     
-    s3 = _create_snapshot(db_session, session, "def y():\\n  return 1\\ndef z():\\n  pass\\n", 3)
+    s3 = _create_snapshot(db_session, session, "def y():\n  return 1\ndef z():\n  pass\n", 3)
     r3 = Run(session_id=session.id, snapshot_id=s3.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=3)
     
     db_session.add_all([r1, r2, r3])
@@ -436,7 +437,7 @@ def test_rf_different_failures(db_session, setup_user_and_session):
     # B-RF-04
     _, _, session = setup_user_and_session
     
-    s1 = _create_snapshot(db_session, session, "def x():\\n  pass\\n", 1)
+    s1 = _create_snapshot(db_session, session, "def x():\n  pass\n", 1)
     r1 = Run(session_id=session.id, snapshot_id=s1.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=1)
     r1.testcase_results = {"compile_error_message": "A"}
     r2 = Run(session_id=session.id, snapshot_id=s1.id, verdict=RunVerdict.RUNTIME_ERROR, execution_generation=2)
@@ -453,7 +454,7 @@ def test_rf_success_breaks(db_session, setup_user_and_session):
     # B-RF-05
     _, _, session = setup_user_and_session
     
-    s1 = _create_snapshot(db_session, session, "def x():\\n  pass\\n", 1)
+    s1 = _create_snapshot(db_session, session, "def x():\n  pass\n", 1)
     r1 = Run(session_id=session.id, snapshot_id=s1.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=1)
     r2 = Run(session_id=session.id, snapshot_id=s1.id, verdict=RunVerdict.ACCEPTED, execution_generation=2)
     r3 = Run(session_id=session.id, snapshot_id=s1.id, verdict=RunVerdict.COMPILE_ERROR, execution_generation=3)
@@ -496,13 +497,13 @@ def test_loc_anomaly(db_session, setup_user_and_session):
         db_session.flush()
         
         # Give them LOC = 10
-        code = "\\n".join([f"line {j}" for j in range(10)])
+        code = "\n".join([f"line {j}" for j in range(10)])
         _create_snapshot(db_session, sess, code, 1)
         
     db_session.commit()
     
     # Our student LOC = 50
-    code = "\\n".join([f"line {j}" for j in range(50)])
+    code = "\n".join([f"line {j}" for j in range(50)])
     _create_snapshot(db_session, session, code, 1)
     
     signal = evaluate_loc_anomaly(session, db_session)
@@ -555,10 +556,10 @@ def test_loc_below_cohort(db_session, setup_user_and_session):
     sess = CodingSession(student_id=u.id, problem_id=problem.id, language=SupportedLanguage.PYTHON3, practice_attempt_id=attempt.id)
     db_session.add(sess)
     db_session.flush()
-    _create_snapshot(db_session, sess, "line\\n", 1)
+    _create_snapshot(db_session, sess, "line\n", 1)
     
     db_session.commit()
-    _create_snapshot(db_session, session, "line\\n" * 50, 1)
+    _create_snapshot(db_session, session, "line\n" * 50, 1)
     
     signal = evaluate_loc_anomaly(session, db_session)
     assert signal is None # Cohort size 1 < 3
@@ -585,10 +586,10 @@ def test_loc_normal(db_session, setup_user_and_session):
         sess = CodingSession(student_id=u.id, problem_id=problem.id, language=SupportedLanguage.PYTHON3, practice_attempt_id=attempt.id)
         db_session.add(sess)
         db_session.flush()
-        _create_snapshot(db_session, sess, "line\\n" * 10, 1)
+        _create_snapshot(db_session, sess, "line\n" * 10, 1)
         
     db_session.commit()
-    _create_snapshot(db_session, session, "line\\n" * 15, 1)
+    _create_snapshot(db_session, session, "line\n" * 15, 1)
     
     signal = evaluate_loc_anomaly(session, db_session)
     assert signal is None # 15/10 = 1.5 <= 2.0
@@ -615,10 +616,10 @@ def test_loc_anomaly_zero_median_no_signal(db_session, setup_user_and_session):
         db_session.add(sess)
         db_session.flush()
         # Empty code (0 lines)
-        _create_snapshot(db_session, sess, "   \\n   ", 1)
+        _create_snapshot(db_session, sess, "   \n   ", 1)
 
     db_session.commit()
-    _create_snapshot(db_session, session, "def solution():\\n  return 1\\n", 1)
+    _create_snapshot(db_session, session, "def solution():\n  return 1\n", 1)
 
     signal = evaluate_loc_anomaly(session, db_session)
     assert signal is None # Zero-median must not generate LOC_ANOMALY
@@ -645,13 +646,13 @@ def test_loc_anomaly_even_cohort_median(db_session, setup_user_and_session):
         sess = CodingSession(student_id=u.id, problem_id=problem.id, language=SupportedLanguage.PYTHON3, practice_attempt_id=attempt.id)
         db_session.add(sess)
         db_session.flush()
-        code = "\\n".join([f"line {j}" for j in range(line_target)])
+        code = "\n".join([f"line {j}" for j in range(line_target)])
         _create_snapshot(db_session, sess, code, 1)
 
     db_session.commit()
 
     # Student has 60 lines -> relative_dev = 60 / 25.0 = 2.4 > 2.0
-    code = "\\n".join([f"line {j}" for j in range(60)])
+    code = "\n".join([f"line {j}" for j in range(60)])
     _create_snapshot(db_session, session, code, 1)
 
     signal = evaluate_loc_anomaly(session, db_session)
@@ -685,12 +686,12 @@ def test_loc_anomaly_threshold_equality_does_not_trigger(db_session, setup_user_
         sess = CodingSession(student_id=u.id, problem_id=problem.id, language=SupportedLanguage.PYTHON3, practice_attempt_id=attempt.id)
         db_session.add(sess)
         db_session.flush()
-        _create_snapshot(db_session, sess, "\\n".join([f"line {j}" for j in range(10)]), 1)
+        _create_snapshot(db_session, sess, "\n".join([f"line {j}" for j in range(10)]), 1)
 
     db_session.commit()
 
     # Exactly 20 lines -> 20 / 10 = 2.0 <= 2.0 -> returns None
-    _create_snapshot(db_session, session, "\\n".join([f"line {j}" for j in range(20)]), 1)
+    _create_snapshot(db_session, session, "\n".join([f"line {j}" for j in range(20)]), 1)
 
     signal = evaluate_loc_anomaly(session, db_session)
     assert signal is None
@@ -721,10 +722,10 @@ def test_loc_anomaly_peer_privacy_invariant(db_session, setup_user_and_session):
         sess = CodingSession(student_id=u.id, problem_id=problem.id, language=SupportedLanguage.PYTHON3, practice_attempt_id=attempt.id)
         db_session.add(sess)
         db_session.flush()
-        _create_snapshot(db_session, sess, "\\n".join([f"peer_secret_line_{j}" for j in range(10)]), 1)
+        _create_snapshot(db_session, sess, "\n".join([f"peer_secret_line_{j}" for j in range(10)]), 1)
 
     db_session.commit()
-    _create_snapshot(db_session, session, "\\n".join([f"my_line_{j}" for j in range(50)]), 1)
+    _create_snapshot(db_session, session, "\n".join([f"my_line_{j}" for j in range(50)]), 1)
 
     signal = evaluate_loc_anomaly(session, db_session)
     assert signal is not None
@@ -735,3 +736,153 @@ def test_loc_anomaly_peer_privacy_invariant(db_session, setup_user_and_session):
     for uname in peer_usernames:
         assert uname not in evidence_str
     assert "peer_secret_line" not in evidence_str
+
+# =======================
+# HISTORICAL IDLE TESTS
+# =======================
+def test_historical_idle_two_consecutive_meaningful_events(db_session, setup_user_and_session):
+    """Scenario 1: Two consecutive meaningful events with gap >= 300s qualify."""
+    _, _, session = setup_user_and_session
+    t1 = session.opened_at + timedelta(seconds=10)
+    t2 = t1 + timedelta(seconds=400) # 400s gap
+
+    e1 = TraceEvent(session_id=session.id, sequence_number=1, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp1", client_timestamp=t1, server_timestamp=t1, payload={})
+    e2 = TraceEvent(session_id=session.id, sequence_number=2, event_type=TraceEventType.RUN_REQUESTED, canonical_fingerprint="fp2", client_timestamp=t2, server_timestamp=t2, payload={})
+    db_session.add_all([e1, e2])
+    db_session.commit()
+
+    signals = evaluate_historical_idle_gaps(session, [e2], db_session)
+    assert len(signals) == 1
+    sig = signals[0]
+    assert sig.signal_type == SignalType.IDLE_DETECTED
+    assert sig.rule_version == "1.0.0"
+    assert sig.evidence["duration_seconds"] == 400.0
+    assert sig.evidence["start_time"] == t1.isoformat()
+    assert sig.evidence["end_time"] == t2.isoformat()
+    assert sig.evidence["meaningful_event_before_id"] == str(e1.id)
+    assert sig.evidence["threshold_used"] == settings.SIGNAL_IDLE_THRESHOLD_SECONDS
+
+def test_historical_idle_session_open_to_first_meaningful(db_session, setup_user_and_session):
+    """Scenario 2: Initial gap from session.opened_at to first meaningful event >= 300s qualifies."""
+    _, _, session = setup_user_and_session
+    t1 = session.opened_at + timedelta(seconds=400) # 400s after open
+
+    e1 = TraceEvent(session_id=session.id, sequence_number=1, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp1", client_timestamp=t1, server_timestamp=t1, payload={})
+    db_session.add(e1)
+    db_session.commit()
+
+    signals = evaluate_historical_idle_gaps(session, [e1], db_session)
+    assert len(signals) == 1
+    sig = signals[0]
+    assert sig.evidence["duration_seconds"] == 400.0
+    assert sig.evidence["start_time"] == session.opened_at.isoformat()
+    assert sig.evidence["end_time"] == t1.isoformat()
+    assert sig.evidence["meaningful_event_before_id"] is None
+    assert sig.evidence["threshold_used"] == settings.SIGNAL_IDLE_THRESHOLD_SECONDS
+
+def test_historical_idle_threshold_equality_and_shorter_gaps(db_session, setup_user_and_session):
+    """Scenario 3: Gap exactly equal to 300s qualifies; shorter gap (299s) does not."""
+    _, _, session = setup_user_and_session
+    t1 = session.opened_at + timedelta(seconds=10)
+    t_exact = t1 + timedelta(seconds=settings.SIGNAL_IDLE_THRESHOLD_SECONDS) # 300s
+    t_short = t_exact + timedelta(seconds=299) # 299s gap
+
+    e1 = TraceEvent(session_id=session.id, sequence_number=1, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp1", client_timestamp=t1, server_timestamp=t1, payload={})
+    e2 = TraceEvent(session_id=session.id, sequence_number=2, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp2", client_timestamp=t_exact, server_timestamp=t_exact, payload={})
+    e3 = TraceEvent(session_id=session.id, sequence_number=3, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp3", client_timestamp=t_short, server_timestamp=t_short, payload={})
+    db_session.add_all([e1, e2, e3])
+    db_session.commit()
+
+    # Exact threshold gap qualifies
+    signals_exact = evaluate_historical_idle_gaps(session, [e2], db_session)
+    assert len(signals_exact) == 1
+    assert signals_exact[0].evidence["duration_seconds"] == 300.0
+
+    # Shorter gap (299s) does not qualify
+    signals_short = evaluate_historical_idle_gaps(session, [e3], db_session)
+    assert len(signals_short) == 0
+
+def test_historical_idle_session_checkpoint_does_not_reset_inactivity(db_session, setup_user_and_session):
+    """Scenario 4: Automated SESSION_CHECKPOINT does not reset inactivity timer."""
+    _, _, session = setup_user_and_session
+    t1 = session.opened_at + timedelta(seconds=10)
+    t_cp = t1 + timedelta(seconds=200) # Automated checkpoint at 200s
+    t2 = t1 + timedelta(seconds=450) # Real edit at 450s
+
+    e1 = TraceEvent(session_id=session.id, sequence_number=1, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp1", client_timestamp=t1, server_timestamp=t1, payload={})
+    e_cp = TraceEvent(session_id=session.id, sequence_number=2, event_type=TraceEventType.SESSION_CHECKPOINT, canonical_fingerprint="fp_cp", client_timestamp=t_cp, server_timestamp=t_cp, payload={})
+    e2 = TraceEvent(session_id=session.id, sequence_number=3, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp2", client_timestamp=t2, server_timestamp=t2, payload={})
+    db_session.add_all([e1, e_cp, e2])
+    db_session.commit()
+
+    signals = evaluate_historical_idle_gaps(session, [e2], db_session)
+    assert len(signals) == 1
+    sig = signals[0]
+    # Checkpoint ignored as non-meaningful: predecessor is e1, gap is 450s
+    assert sig.evidence["meaningful_event_before_id"] == str(e1.id)
+    assert sig.evidence["duration_seconds"] == 450.0
+
+def test_historical_idle_non_meaningful_events_transparent(db_session, setup_user_and_session):
+    """Scenario 5: Non-meaningful events (PROBLEM_OPENED, SNAPSHOT_CREATED) do not fragment a gap."""
+    _, _, session = setup_user_and_session
+    t1 = session.opened_at + timedelta(seconds=10)
+    t_po = t1 + timedelta(seconds=100)
+    t_sc = t1 + timedelta(seconds=250)
+    t2 = t1 + timedelta(seconds=500)
+
+    e1 = TraceEvent(session_id=session.id, sequence_number=1, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp1", client_timestamp=t1, server_timestamp=t1, payload={})
+    e_po = TraceEvent(session_id=session.id, sequence_number=2, event_type=TraceEventType.PROBLEM_OPENED, canonical_fingerprint="fp_po", client_timestamp=t_po, server_timestamp=t_po, payload={})
+    e_sc = TraceEvent(session_id=session.id, sequence_number=3, event_type=TraceEventType.SNAPSHOT_CREATED, canonical_fingerprint="fp_sc", client_timestamp=t_sc, server_timestamp=t_sc, payload={})
+    e2 = TraceEvent(session_id=session.id, sequence_number=4, event_type=TraceEventType.SUBMISSION_CREATED, canonical_fingerprint="fp2", client_timestamp=t2, server_timestamp=t2, payload={})
+    db_session.add_all([e1, e_po, e_sc, e2])
+    db_session.commit()
+
+    signals = evaluate_historical_idle_gaps(session, [e2], db_session)
+    assert len(signals) == 1
+    sig = signals[0]
+    assert sig.evidence["meaningful_event_before_id"] == str(e1.id)
+    assert sig.evidence["duration_seconds"] == 500.0
+
+def test_historical_idle_inverted_server_timestamp_non_qualifying(db_session, setup_user_and_session):
+    """Scenario 10: Inverted server timestamps resulting in negative/zero duration do not qualify."""
+    _, _, session = setup_user_and_session
+    t_base = session.opened_at + timedelta(seconds=10)
+    t_late = t_base + timedelta(seconds=400) # Arrival inversion: seq 2 has later ts than seq 3
+    t_early = t_base + timedelta(seconds=350)
+
+    e1 = TraceEvent(session_id=session.id, sequence_number=1, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp1", client_timestamp=t_base, server_timestamp=t_base, payload={})
+    e2 = TraceEvent(session_id=session.id, sequence_number=2, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp2", client_timestamp=t_late, server_timestamp=t_late, payload={})
+    e3 = TraceEvent(session_id=session.id, sequence_number=3, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp3", client_timestamp=t_early, server_timestamp=t_early, payload={})
+    db_session.add_all([e1, e2, e3])
+    db_session.commit()
+
+    # e3 evaluated against causal predecessor e2 has duration = 350 - 400 = -50s <= 0 => does not qualify
+    signals = evaluate_historical_idle_gaps(session, [e3], db_session)
+    assert len(signals) == 0
+
+def test_historical_idle_distinct_episodes_remain_distinct(db_session, setup_user_and_session):
+    """Scenario 17: Distinct idle episodes within same session remain distinct with separate dedup keys."""
+    _, _, session = setup_user_and_session
+    t1 = session.opened_at + timedelta(seconds=400) # Episode 1: opened_at -> e1 (400s)
+    t2 = t1 + timedelta(seconds=500) # Episode 2: e1 -> e2 (500s)
+
+    e1 = TraceEvent(session_id=session.id, sequence_number=1, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp1", client_timestamp=t1, server_timestamp=t1, payload={})
+    e2 = TraceEvent(session_id=session.id, sequence_number=2, event_type=TraceEventType.EDITOR_CHANGED, canonical_fingerprint="fp2", client_timestamp=t2, server_timestamp=t2, payload={})
+    db_session.add_all([e1, e2])
+    db_session.commit()
+
+    signals = evaluate_historical_idle_gaps(session, [e1, e2], db_session)
+    assert len(signals) == 2
+    assert signals[0].dedup_key != signals[1].dedup_key
+    assert signals[0].evidence["meaningful_event_before_id"] is None
+    assert signals[1].evidence["meaningful_event_before_id"] == str(e1.id)
+
+def test_loc_and_change_ratio_use_real_line_breaks():
+    # Regression: snapshot content uses real line breaks (LF or CRLF), not the literal two-character "\n"
+    from app.services.judge.signals import _count_loc, _code_change_ratio
+    code_lf = "def solve():\n    x = 1\n\n    return x\n"
+    code_crlf = code_lf.replace("\n", "\r\n")
+    assert _count_loc(code_lf) == 3
+    assert _count_loc(code_crlf) == 3
+    assert _code_change_ratio(code_lf, code_crlf) == 0.0
+    assert _code_change_ratio(code_lf, "def solve():\n    x = 2\n\n    return x\n") > 0.0

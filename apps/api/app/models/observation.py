@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, ForeignKey, Integer, DateTime
+from sqlalchemy import String, ForeignKey, Integer, DateTime, BigInteger, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
@@ -68,3 +68,25 @@ class PointTransaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     student: Mapped["User"] = relationship("User")
+
+class TraceSignalOutbox(Base):
+    __tablename__ = "trace_signal_outbox"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("coding_sessions.id", ondelete="RESTRICT"), index=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trace_events.id", ondelete="RESTRICT"), unique=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(50))
+    sequence_number: Mapped[int] = mapped_column(Integer)
+    server_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.current_timestamp(),
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+    session: Mapped["CodingSession"] = relationship("CodingSession")
+    event: Mapped["TraceEvent"] = relationship("TraceEvent")
+
+    __table_args__ = (
+        UniqueConstraint('event_id', name='uq_trace_signal_outbox_event_id'),
+    )

@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 from datetime import datetime, timezone
 import difflib
 import re
@@ -16,12 +16,11 @@ from app.models.class_org import ClassMembership, Class
 from app.models.problem import Problem
 from app.services.storage import storage_adapter
 
-# Meaningful events for IDLE_DETECTED
+# Meaningful events for IDLE_DETECTED (strictly closed domain set)
 MEANINGFUL_EVENT_TYPES = {
     TraceEventType.EDITOR_CHANGED,
     TraceEventType.RUN_REQUESTED,
     TraceEventType.SUBMISSION_CREATED,
-    TraceEventType.SESSION_CHECKPOINT,
 }
 
 def _get_stable_time(dt: datetime) -> int:
@@ -80,6 +79,91 @@ def evaluate_idle_detected(session: CodingSession, db: Session, evaluated_at: Op
         )
     return None
 
+def evaluate_historical_idle_gaps(session: CodingSession, target_events: List[Any], db: Session) -> List[AttentionSignal]:
+    """
+    Evaluates historical IDLE_DETECTED signals for intervals closed by target_events.
+    target_events can be TraceSignalOutbox or TraceEvent items belonging to session.
+    Enforces deterministic causal predecessor lookup and non-positive duration guards.
+    """
+    signals: List[AttentionSignal] = []
+    if not target_events:
+        return signals
+
+    sorted_targets = sorted(target_events, key=lambda e: getattr(e, "sequence_number", 0))
+
+    for event in sorted_targets:
+        event_seq = getattr(event, "sequence_number", 0)
+        event_ts = getattr(event, "server_timestamp", None)
+        event_id = getattr(event, "event_id", None) or getattr(event, "id", None)
+        event_type = getattr(event, "event_type", None)
+        if hasattr(event_type, "value"):
+            event_type = event_type.value
+
+        # Predecessor query in trace_events: immediate preceding meaningful event in sequence
+        stmt = (
+            select(TraceEvent)
+            .where(
+                and_(
+                    TraceEvent.session_id == session.id,
+                    TraceEvent.event_type.in_(MEANINGFUL_EVENT_TYPES),
+                    TraceEvent.sequence_number < event_seq
+                )
+            )
+            .order_by(desc(TraceEvent.sequence_number))
+            .limit(1)
+        )
+        prev_event = db.execute(stmt).scalar_one_or_none()
+
+        if prev_event:
+            start_time = prev_event.server_timestamp
+            prev_id = str(prev_event.id)
+            prev_type = getattr(prev_event.event_type, "value", prev_event.event_type)
+        else:
+            start_time = session.opened_at
+            prev_id = None
+            prev_type = "SESSION_OPENED"
+
+        gap_seconds = (event_ts - start_time).total_seconds()
+
+        # Guard against non-positive durations (e.g. inverted arrival timestamps)
+        if gap_seconds <= 0:
+            continue
+
+        if gap_seconds >= settings.SIGNAL_IDLE_THRESHOLD_SECONDS:
+            window = 1
+            dedup_key = f"IDLE:{session.id}:{_get_stable_time(start_time)}:W{window}"
+
+            evidence = {
+                "session_id": str(session.id),
+                "start_time": start_time.isoformat(),
+                "end_time": event_ts.isoformat(),
+                "duration_seconds": gap_seconds,
+                "meaningful_event_before_id": prev_id,
+                "threshold_used": settings.SIGNAL_IDLE_THRESHOLD_SECONDS,
+                # Canonical & legacy compatibility fields
+                "last_meaningful_event_at": start_time.isoformat(),
+                "evaluated_at": event_ts.isoformat(),
+                "idle_duration_seconds": gap_seconds,
+                "threshold_seconds": settings.SIGNAL_IDLE_THRESHOLD_SECONDS,
+                "last_meaningful_event_type": prev_type,
+                "gap_closed": True,
+                "closing_event_id": str(event_id) if event_id else None,
+                "closing_event_type": event_type,
+            }
+
+            signals.append(
+                AttentionSignal(
+                    student_id=session.student_id,
+                    session_id=session.id,
+                    signal_type=SignalType.IDLE_DETECTED,
+                    rule_version=settings.SIGNAL_RULE_VERSION,
+                    evidence=evidence,
+                    dedup_key=dedup_key
+                )
+            )
+
+    return signals
+
 def evaluate_fast_first_code(session: CodingSession, db: Session) -> Optional[AttentionSignal]:
     # First edit inside configured threshold
     stmt = (
@@ -129,17 +213,17 @@ def evaluate_fast_first_code(session: CodingSession, db: Session) -> Optional[At
 def _normalize_error(run: Run) -> str:
     if run.verdict == RunVerdict.COMPILE_ERROR and run.testcase_results and "compile_error_message" in run.testcase_results:
         err = run.testcase_results["compile_error_message"] or ""
-        first_line = err.split("\\n")[0] if err else ""
+        first_line = err.splitlines()[0] if err else ""
         return re.sub(r"0x[0-9a-fA-F]+|\d+", "X", first_line).strip()
     elif run.verdict == RunVerdict.RUNTIME_ERROR and run.testcase_results and "runtime_error_message" in run.testcase_results:
         err = run.testcase_results["runtime_error_message"] or ""
-        first_line = err.split("\\n")[0] if err else ""
+        first_line = err.splitlines()[0] if err else ""
         return re.sub(r"0x[0-9a-fA-F]+|\d+", "X", first_line).strip()
     return getattr(run.verdict, "value", run.verdict) if run.verdict else "UNKNOWN"
 
 def _code_change_ratio(code1: str, code2: str) -> float:
-    lines1 = [line for line in code1.split("\\n") if line.strip()]
-    lines2 = [line for line in code2.split("\\n") if line.strip()]
+    lines1 = [line for line in code1.splitlines() if line.strip()]
+    lines2 = [line for line in code2.splitlines() if line.strip()]
     if not lines1 and not lines2:
         return 0.0
     ratio = difflib.SequenceMatcher(None, lines1, lines2).ratio()
@@ -225,7 +309,7 @@ def evaluate_repeated_failure(session: CodingSession, db: Session) -> Optional[A
     )
 
 def _count_loc(code: str) -> int:
-    return len([line for line in code.split("\\n") if line.strip()])
+    return len([line for line in code.splitlines() if line.strip()])
 
 def evaluate_loc_anomaly(session: CodingSession, db: Session) -> Optional[AttentionSignal]:
     min_cohort = settings.SIGNAL_LOC_MIN_COHORT_SIZE
