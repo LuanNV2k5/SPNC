@@ -21,4 +21,14 @@ class JudgeQueue:
             print(f"Failed to enqueue run {run_id}: {e}")
             return False
 
+    def enqueue_submission(self, submission_id: uuid.UUID):
+        self.connect()
+        try:
+            message = {"kind": "submission", "submission_id": str(submission_id)}
+            self.redis_client.lpush("judge_queue", json.dumps(message))
+            return True
+        except Exception as e:
+            print(f"Failed to enqueue submission {submission_id}: {e}")
+            return False
+
 judge_queue = JudgeQueue()

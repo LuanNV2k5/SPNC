@@ -1,7 +1,7 @@
 """Phase 05 — Academic domain schemas (Class, Problem, Exam, Practice, Session, Submission)."""
 import uuid
 from datetime import datetime
-from typing import List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -299,12 +299,21 @@ class SubmissionResponse(BaseModel):
     problem_id: uuid.UUID
     session_id: uuid.UUID
     snapshot_id: uuid.UUID
+    exam_id: Optional[uuid.UUID] = None
+    source: str = "STUDENT"
     status: str
     verdict: Optional[str]
     score: Optional[int]
+    # Filtered per docs/36 D7 (hidden-case I/O never present) and D14 (visibility)
+    judge_result: Optional[Dict[str, Any]] = None
+    result_visible: bool = True
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SubmitRequest(BaseModel):
+    snapshot_id: uuid.UUID
 
 
 class SubmissionListResponse(PaginatedResponse):

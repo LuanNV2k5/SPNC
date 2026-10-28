@@ -502,12 +502,15 @@ def end_exam_session(db: Session, student: User, session_id: uuid.UUID, req: End
 # ============================================================
 
 def list_submissions(db: Session, student: User, skip: int, limit: int):
-    return repo.get_submissions_by_student(db, student.id, skip=skip, limit=limit)
+    from app.services.submission import to_student_response
+    items, total = repo.get_submissions_by_student(db, student.id, skip=skip, limit=limit)
+    return [to_student_response(s) for s in items], total
 
 def get_submission(db: Session, student: User, submission_id: uuid.UUID):
+    from app.services.submission import to_student_response
     s = repo.get_submission_by_id(db, submission_id)
     if not s:
         raise HTTPException(status_code=404, detail=_error("SUBMISSION_NOT_FOUND", "Submission not found"))
     if s.student_id != student.id:
         raise HTTPException(status_code=403, detail=_error("SUBMISSION_FORBIDDEN", "Not your submission"))
-    return s
+    return to_student_response(s)

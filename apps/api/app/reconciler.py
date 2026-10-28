@@ -4,6 +4,7 @@ from app.db.session import SessionLocal
 from app.core.config import settings
 from app.repositories.run import run_repository
 from app.services.queue import judge_queue
+from app.services.submission import recover_stale_submissions
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,6 +23,9 @@ def reconcile():
                 judge_queue.enqueue_run(recovered_run.id)
             else:
                 logger.info(f"Failed to claim stale run {run.id} (already recovered by another process)")
+
+        # Phase 10A: same sweep for submission jobs
+        recover_stale_submissions(db, settings.JUDGE_STALE_SUBMISSION_TIMEOUT_SECONDS)
 
 if __name__ == "__main__":
     while True:

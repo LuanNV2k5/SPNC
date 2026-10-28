@@ -169,4 +169,32 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before implementation, 
 
 ## 10. Verification Record
 
-*To be completed at Phase 10 closure.*
+### 10.1 Changes
+| Sub-phase | Commit | Files |
+|---|---|---|
+| 10A checkpoint | `a576fd0` | migration `b8e4f2a91d03` (submission columns, `submission.judged` NOTIFY), `Submission`/`SubmissionSource`, test case CRUD + samples (`app/services/testcase.py`, `app/api/endpoints/testcase.py`), `app/services/judge/grader.py`, per-problem memory limit in sandbox/adapters, `app/repositories/submission.py` (CAS fencing, D5 total). |
+| 10A | `feat(phase10a): submit and judge submissions` | `app/services/submission.py` (submit transaction, `judge_submission`, `recover_stale_submissions`, D7/D14 student view), `app/api/endpoints/submission.py` (`POST /my/coding-sessions/{id}/submissions`), `app/services/queue.py` (`enqueue_submission`), `app/worker.py` (dispatch by `kind`), `app/reconciler.py` (submission sweep), `SubmissionResponse` (+`exam_id`, `source`, `judge_result`, `result_visible`). |
+
+### 10.2 10A Behaviour Notes
+- **Submit transaction:** session `FOR UPDATE` → ownership / ACTIVE / snapshot-in-session → exam window (participation IN_PROGRESS, exam not CANCELLED, `start_time ≤ now < end_time`) → ≥1 test case (422 `PROBLEM_HAS_NO_TEST_CASES`) → `Submission` PENDING → `SUBMISSION_CREATED` (seq max+1, `{source:"SERVER", submission_id, code_snapshot_id}`) → `finalize_session(ENDED, STUDENT)` (D2; `SESSION_ENDED` follows at max+1) → one commit → enqueue. A lost enqueue is recovered by the reconciler.
+- **Error codes:** 404 `SESSION_NOT_FOUND` / `SUBMISSION_SNAPSHOT_NOT_FOUND`; 403 `SESSION_FORBIDDEN`, `SUBMISSION_SESSION_NOT_ACTIVE`, `SUBMISSION_SNAPSHOT_INVALID`, `PARTICIPATION_NOT_ACTIVE`, `EXAM_CANCELLED`, `EXAM_NOT_STARTED`, `EXAM_ENDED`; 422 `PROBLEM_HAS_NO_TEST_CASES`.
+- **Judge:** claim (CAS) → snapshot content via `storage_adapter` → `grade()` with `score_base = ExamProblem.max_score` (exam) or 100 (practice) and the problem's limits (D12) → fenced `write_result` → exam: `recompute_exam_total` (D5) → commit. A stale generation's result is discarded. `FAILED_INTERNAL` (verdict `INTERNAL_ERROR`, score null) when: grader reports an internal error, the language has no adapter, snapshot content is unavailable (code is never fabricated), the problem has no test cases at judge time, the problem was detached from the exam, or the adapter raises.
+- **Worker:** messages `{"kind":"submission","submission_id"}` go to `judge_submission`; messages without `kind` keep the Phase 07 Run path. Fixed the pre-existing Run bug that read the non-existent `snapshot.source_code`; Runs now read content through `storage_adapter` and fail as `FAILED_INTERNAL` ("Snapshot content unavailable") when it is missing.
+- **Reconciler:** after the Run sweep, stale PENDING/RUNNING submissions (`updated_at` older than `JUDGE_STALE_SUBMISSION_TIMEOUT_SECONDS`) get a generation bump (back to PENDING) and are re-enqueued.
+- **Student read (`/my/submissions[/{id}]`):** `judge_result` is rebuilt from a whitelist: per-case `testcase_id, order_index, is_sample, verdict, passed, execution_time_ms, memory_used_kb` for all cases; `input, expected_output, stdout, stderr` only for samples (D7). An internal failure shows `{"internal_error": true}` without the message. D14: practice results are always visible; exam submissions show `status` but `verdict`, `score`, `judge_result` are null and `result_visible=false` until 10B adds `allow_view_result_after` and the ENDED state.
+
+### 10.3 Verification (10A)
+| Check | Environment | Result |
+|---|---|---|
+| 10A `test_submissions.py` (in-process judge, fake adapter) | Disposable PostgreSQL 16.15, `spnc_phase10_submission_test` | **13 passed** (3 consecutive runs) |
+| 10A `tests/judge/test_submission_fencing.py` | same | **6 passed** |
+| 10A checkpoint `test_grader.py`, `test_testcases.py` | same | **12 + 7 passed** |
+| Phase 03–07 (`test_auth` 58, `test_db_guard` 3, `test_admin` 27, `test_academic` 90, `test_trace` 15, `test_run` 16, `test_fencing` 10, `test_queue` 6, `test_adapters` 24, `test_sandbox_security` 13) | Fresh per-phase DBs on the same server; Redis; Docker sandbox | **262 passed** |
+| Phase 08 suite (`test_db_invariants`, outbox schema, signals ×4, scheduler ×6) | Fresh `spnc_phase10_fresh` | **90 passed** |
+| Phase 08E–09 (`test_session_lifecycle` 15, `test_observation` 17, `test_annotations` 18, `test_ws_notifications` 6) | Fresh per-phase DBs | **56 passed** |
+| **Total** | each file run on its own, fresh databases migrated to head | **446 passed, 0 failed** |
+
+### 10.4 Known Limitations (10A)
+- Snapshot storage is per-process memory, so a separate worker process cannot read content uploaded by the API process; such submissions end `FAILED_INTERNAL`. Shared blob storage is still required before deployment (out of scope). Tests run the judge in-process.
+- `SUBMISSION_CREATED` is now server-authored, but trace ingest does not yet reserve it the way 08E reserves `SESSION_ENDED`; a client can still send an event of that type. Reserving it changes Phase 06/08 ingest behaviour and needs a decision.
+- Exam result visibility stays closed until 10B (D14).
