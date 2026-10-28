@@ -208,3 +208,27 @@ Constraints:
 - Requires a new Alembic migration after `c4819d7a2e10`. Historical migrations stay untouched (PROJECT_RULES #4–5).
 - Already-stored `AttentionSignal.evidence` stays immutable. `LOC_ANOMALY.final_loc` stays null on signals created while the session was active (DCR SPNC_LOC_EVIDENCE_CONTRACT).
 - Specification: `docs/34_SESSION_HARDENING.md`. Implementation starts only after that specification is approved.
+
+---
+
+## Decision: Phase 08E Session Hardening Specification Approval
+
+Date:
+2026-10-28
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-28): "Duyệt theo khuyến nghị". All recommendations in `docs/34_SESSION_HARDENING.md` §8 are approved without overrides.
+
+Approved Decisions:
+- D1 `working_time_seconds = ended_at − opened_at` (server wall clock).
+- D2 `final_loc` = non-blank lines of the final snapshot (same policy as `LOC_ANOMALY`).
+- D3 No snapshot → `final_loc = null`, `final_code_snapshot_id = null`.
+- D4 Trace ingest rejects client `SESSION_ENDED` (422 `TRACE_EVENT_TYPE_RESERVED`). This is an approved Phase 06 ingest contract change.
+- D5 Student end requests with non-STUDENT `termination_source` → 422.
+- D6 Optional `last_sequence_number` flush guard → 409 `TRACE_NOT_FLUSHED`.
+- D7 `LOC_ANOMALY` created after finalization carries `final_loc = session.final_loc`; `rule_version` → `"1.1.0"`. Stored evidence is not mutated.
+- D8 REQ-SESSION-003/004 excluded from 08E (requires Submission pipeline).
+- D9 No backfill for sessions ended before 08E.
