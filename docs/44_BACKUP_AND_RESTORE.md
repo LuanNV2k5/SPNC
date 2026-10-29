@@ -165,6 +165,8 @@ Implementation notes:
 | AC-18-06 schedule | Project `spnc-p18-sched`, `BACKUP_TIME_UTC` = 3 min ahead, `BACKUP_KEEP=2`, two old sets present | set `spnc-20261029T131600Z` created at 13:16:00 UTC, oldest set pruned, `last-backup.json` `ok`, next run scheduled +24 h |
 | AC-18-07 full regression | This machine, `regression.sh all`, `PG_BASE` on port 55433 | **557 passed, 0 failed** (45 files; Phase 16 baseline 538 + 19 new). The shared 5432 container's per-database transaction counters rose only by its idle background rate (2–4 per 100 s per database, measured afterwards; about 30 over the run), so no test used it |
 | AC-18-07 CI | GitHub Actions run 40881419054 (`d1cc8b8`) | all 6 groups green, `ci` green |
+| After merging `main` (Phase 17) into `phase18` (`465ed4b`) | This machine | restore drill **passed, 20 s**; `regression.sh all` **580 passed, 0 failed** (46 files = 557 + Phase 17's 23) |
+| PR [#5](https://github.com/LuanNV2k5/SPNC/pull/5) CI | runs 40891127487, 40891190579 (`465ed4b`) | all 6 groups green, `ci` green |
 | AC-18-08 drill on GitHub | run 40880784168 (`workflow_dispatch`, `c49b4d6`) | `backup drill` **success**, `compose E2E` success (the `phase10plus` failure in that run is the §8.2 test fix) |
 | AC-18-09 defaults | `docker compose config` with the Phase 16 `.env.example` (no new variables) | API 8000, console 9001 unchanged; backup defaults `./backups`, `19:00`, 14 |
 | Demo stack untouched | `docker ps` | project `phase11` containers and volumes unchanged throughout |
