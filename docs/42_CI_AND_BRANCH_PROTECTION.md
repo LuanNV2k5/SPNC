@@ -1,7 +1,7 @@
 # 42 — CONTINUOUS INTEGRATION & BRANCH PROTECTION (PHASE 16 / STEP 1) SPECIFICATION
 
 > **Module:** GitHub Actions CI, protection of `main`, small technical-debt fixes
-> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTED AND VERIFIED 2026-10-29 (§7); lock tag pending Project Owner review
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-16-ci-locked`, on the merge commit of PR #2)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-15a-oq-review-locked` (`efdabd3`, = `main`)
 > **Proposed Branch:** `phase16`
