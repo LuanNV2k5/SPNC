@@ -570,3 +570,23 @@ Decisions:
 - Q1–Q3 (OQ-16, REQ-STU-004): practice-only points, once per problem at the first ACCEPTED submission, EASY 10 / MEDIUM 20 / HARD 30 / none 10; cumulative, never reset; no leaderboard; exam submissions never award points.
 - Q4 (OQ-26): dedicated judge VM with its own Docker daemon, gVisor runtime for sandboxes, least-privilege PostgreSQL role for the worker; the socket-mount compose stack remains demo/dev only.
 - Q5 (OQ-27): deadline = min(started_at + duration_minutes, end_time); confirms docs/38 D7.
+
+---
+
+## Decision: Phase 14 Lock
+
+Date:
+2026-10-29
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Lock Phase 14".
+
+Locked Baseline:
+| Phase | Spec | Lock commit | Tag | Verification |
+|---|---|---|---|---|
+| 14 Open-question decisions (points, judge isolation, duration) | docs/40 | this commit | `phase-14-open-questions-locked` | 527 passed (Phase 03–14), compose E2E 4 |
+
+Tag is local; nothing was pushed.

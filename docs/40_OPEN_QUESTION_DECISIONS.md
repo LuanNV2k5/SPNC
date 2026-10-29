@@ -1,7 +1,7 @@
 # 40 — DECISIONS FOR OQ-16, OQ-26, OQ-27 (PHASE 14) PROPOSAL
 
 > **Module:** Practice points (REQ-STU-004), production judge isolation, exam duration semantics
-> **Status:** APPROVED 2026-10-29 (Q1–Q5 as recommended; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTED AND VERIFIED 2026-10-29 (§6); lock tag pending Project Owner review
+> **Status:** APPROVED 2026-10-29 (Q1–Q5 as recommended; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-14-open-questions-locked`)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-13-backend-complete-locked` (`409cd97`)
 > **Proposed Branch:** `phase14`
