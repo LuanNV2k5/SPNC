@@ -4,7 +4,8 @@
 > reconciler, signal scheduler, exam scheduler. Backend only (no frontend yet).
 >
 > **Not for production.** The judge worker mounts the host Docker socket (docs/37 D3), which
-> gives it host-root-equivalent access. Production isolation of the judge zone is OQ-26.
+> gives it host-root-equivalent access. For production, run the judge on a dedicated host as
+> described in §8 (OQ-26, resolved by docs/40 Q4).
 
 ## 1. Prerequisites
 - Docker Engine / Docker Desktop with Compose v2.
@@ -57,3 +58,30 @@ docker compose logs -f api worker
 docker compose down        # keep data
 docker compose down -v     # also delete PostgreSQL and MinIO volumes
 ```
+
+## 8. Production judge host (docs/40 Q4)
+The core stack (API, PostgreSQL, Redis, MinIO, reconciler, schedulers) runs **without** the `worker` service and without any Docker socket mount. Judge workers run on separate VMs:
+
+1. **Database role** (once, as the database owner, after `alembic upgrade head`):
+   ```bash
+   psql "$DATABASE_URL" -f deploy/sql/judge_worker_role.sql
+   psql "$DATABASE_URL" -c "ALTER ROLE spnc_judge PASSWORD '<secret>'"
+   ```
+   The role can read problems, test cases, snapshot metadata and exam max scores. It can update only judge results, the exam total and practice point awards (verified by `tests/infra/test_judge_isolation.py`).
+2. **Read-only MinIO user** for the snapshot bucket (MinIO policy with `s3:GetObject` on `spnc-snapshots/*` only).
+3. **Judge VM:** install Docker and gVisor, and register the runtime:
+   ```bash
+   sudo runsc install
+   sudo systemctl restart docker
+   docker run --rm --runtime=runsc python:3.10-slim python -c "print('gvisor ok')"
+   docker pull python:3.10-slim
+   docker pull gcc:12
+   ```
+4. **Firewall:** the judge VM may reach only the core PostgreSQL, Redis and MinIO ports.
+5. **Start the worker** with `deploy/judge-host/docker-compose.yml`. Set `JUDGE_DATABASE_URL` (as `spnc_judge`), `JUDGE_REDIS_URL`, `JUDGE_S3_ENDPOINT`, `JUDGE_S3_ACCESS_KEY` and `JUDGE_S3_SECRET_KEY` in that host's `.env`; the file sets `JUDGE_CONTAINER_RUNTIME=runsc`.
+   ```bash
+   docker compose -f deploy/judge-host/docker-compose.yml up -d
+   ```
+6. **Check:** submit a practice solution and confirm the worker log shows the job and the submission ends `COMPLETED`. `docker inspect` on a running sandbox should show `"Runtime": "runsc"`.
+
+Add more judge VMs to scale; each pulls jobs from the same Redis queue, and the CAS fencing (Phase 07/10A) keeps one result per job.

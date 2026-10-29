@@ -1,0 +1,34 @@
+# SPNC production judge host (docs/40 Q4, OQ-26 resolved). Runs ONLY the judge worker.
+#
+# Deploy on a dedicated VM whose Docker daemon is used for nothing else. The worker reaches
+# that VM's own daemon; the core zone (API, PostgreSQL, Redis, MinIO) never exposes a
+# container runtime. A sandbox escape therefore reaches only this disposable VM.
+#
+# Prerequisites on the judge VM (see docs/RUNBOOK.md §8):
+#   - gVisor installed and registered with Docker as runtime "runsc"
+#   - sandbox images pulled: python:3.10-slim, gcc:12
+#   - deploy/sql/judge_worker_role.sql applied on the core database; DATABASE_URL uses spnc_judge
+#   - a MinIO user with read-only access to the snapshot bucket
+#   - network access to the core PostgreSQL, Redis and MinIO only (firewall everything else)
+
+services:
+  judge-worker:
+    image: ${SPNC_API_IMAGE:-spnc-api:local}
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    user: root   # owns the per-run workspaces it hands to the sandbox uid
+    environment:
+      DATABASE_URL: ${JUDGE_DATABASE_URL}          # postgresql://spnc_judge:<secret>@<core-db>:5432/<db>
+      REDIS_URL: ${JUDGE_REDIS_URL}                # redis://<core-redis>:6379/0
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: ${JUDGE_S3_ENDPOINT}            # <core-minio>:9000
+      S3_ACCESS_KEY: ${JUDGE_S3_ACCESS_KEY}        # read-only MinIO user
+      S3_SECRET_KEY: ${JUDGE_S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-spnc-snapshots}
+      S3_SECURE: ${JUDGE_S3_SECURE:-true}
+      JUDGE_CONTAINER_RUNTIME: runsc               # gVisor for every sandbox container
+    volumes:
+      # This VM's own daemon (not the core zone's)
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Bind sources are resolved by the daemon, so the path must match inside and out (docs/37 F5)
+      - /tmp/spnc_judge:/tmp/spnc_judge

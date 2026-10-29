@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     JUDGE_PIDS_LIMIT: int = 64
     JUDGE_OUTPUT_LIMIT_BYTES: int = 1048576  # 1MB
     JUDGE_TEMP_DIR: str = "/tmp/spnc_judge"
+    # docs/40 Q4 (OQ-26): container runtime for sandboxes, e.g. "runsc" (gVisor) on judge hosts; empty = default
+    JUDGE_CONTAINER_RUNTIME: str = ""
     # docs/36 D12: measured run time includes interpreter start inside the container
     JUDGE_STARTUP_ALLOWANCE_MS: int = 500
     # Submissions stuck in PENDING/RUNNING longer than this are re-queued by the reconciler

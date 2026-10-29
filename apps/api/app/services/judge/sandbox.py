@@ -54,9 +54,12 @@ class Sandbox:
         # Per-call memory limit (docs/36 D12), never above the global maximum
         memory_mb = min(memory_limit_mb or settings.JUDGE_MEMORY_LIMIT_MB, settings.JUDGE_MEMORY_LIMIT_MB)
         container = None
+        # docs/40 Q4 (OQ-26): production judge hosts run sandboxes under gVisor ("runsc"); empty = daemon default
+        runtime_opts = {"runtime": settings.JUDGE_CONTAINER_RUNTIME} if settings.JUDGE_CONTAINER_RUNTIME else {}
         try:
             # Create container explicitly to control limits and networking
             container = self.client.containers.create(
+                **runtime_opts,
                 image=image,
                 command=command,
                 working_dir=workdir,
