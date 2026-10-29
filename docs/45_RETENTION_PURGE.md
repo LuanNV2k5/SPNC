@@ -1,7 +1,7 @@
 # 45 — RETENTION PURGE (PHASE 19 / STEP 3) SPECIFICATION
 
 > **Module:** configurable deletion of raw trace data and expired operational rows
-> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md)
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-19-retention-locked`, on the merge commit of the lock PR)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-17-observability-locked` (`4300655`, = `main`)
 > **Proposed Branch:** `phase19`
@@ -187,4 +187,4 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 | AC-19-01…10 `test_phase19_retention.py` | this machine, own PostgreSQL 16 on port 55434, memory storage backend | **13 passed** |
 | Migration `c3e7a1f5d920` up / down / up | same, empty database | OK; single Alembic head |
 | Full local regression `regression.sh all` after merging `main` (Phase 18) | same (`PG_BASE` on port 55434, every group isolated) | **593 passed, 0 failed** (47 files; 580 before this phase + 13) |
-| AC-19-11 CI on the PR | GitHub-hosted | _pending_ |
+| AC-19-11 CI on PR #7 | GitHub-hosted `ubuntu-24.04`, runs 40899020252 (push) and 40899094013 (pull_request) | all 6 groups green, `ci` green (14 checks passed, 0 failed; compose E2E and backup drill skipped as on every PR); merged as `32123f0` (merge commit) |

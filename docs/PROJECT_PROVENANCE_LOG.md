@@ -765,3 +765,24 @@ Project Owner explicit authorization (2026-10-29): "Approve all" (reply to "Appr
 
 Approved Decisions (summary):
 D1 purge raw trace only (trace events, scratchpad revisions, checkpoint snapshots no run/submission/final code references, and their blobs) after `retention_days`, plus refresh tokens expired more than 7 days; academic records and audit logs kept; D2 hard delete, session row kept with `trace_purged_at`; D3 one service used by a CLI (`retention-purge`, dry run by default, `--apply`) and a reconciler hook off by default (`RETENTION_PURGE_ENABLED=false`), daily, bounded batches, `SKIP LOCKED` + advisory lock; D4 exclusions of docs/45 §3.1 plus `exams.retention_hold` set by ADMIN via `PUT /api/v1/admin/exams/{id}/retention-hold` (audited); D5 one `RETENTION_PURGE` audit row per applied batch; D6 rows deleted and committed before blobs, only unreferenced blobs deleted, failures left to the orphan sweep; D7 reuse admin `retention_days`, unset default 30 → 180, floor `RETENTION_MIN_DAYS=30`; D8 purge metrics in `app/core/metrics.py`; D9 merge only after Phase 18 is locked on `main`.
+
+---
+
+## Decision: Phase 19 Lock
+
+Date:
+2026-10-29
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Merge when green" (PR #7), then "Lock Phase 19".
+
+Locked Baseline:
+| Phase | Spec | Merged via | Tag | Verification |
+|---|---|---|---|---|
+| 19 Retention purge | docs/45 | PR #7 (`32123f0`), lock PR (this commit) | `phase-19-retention-locked` on the merge commit of the lock PR | `test_phase19_retention.py` 13 passed; migration `c3e7a1f5d920` up/down/up; local `regression.sh all` on a disposable PostgreSQL after merging Phase 18: 593 passed, 0 failed (47 files); GitHub Actions all 6 groups green on PR #7 |
+
+Note:
+Merged after `phase-18-backup-locked` was on `main` (docs/45 D9). The daily purge hook ships disabled (`RETENTION_PURGE_ENABLED=false`); enabling it in a deployment is an operator step (RUNBOOK §10), after a backup.
