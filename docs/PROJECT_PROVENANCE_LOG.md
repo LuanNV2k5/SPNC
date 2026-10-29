@@ -590,3 +590,29 @@ Locked Baseline:
 | 14 Open-question decisions (points, judge isolation, duration) | docs/40 | this commit | `phase-14-open-questions-locked` | 527 passed (Phase 03–14), compose E2E 4 |
 
 Tag is local; nothing was pushed.
+
+---
+
+## Decision: Open Question Review (Step 0) — OQ-01…13, 15, 23, 24
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_DECISION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve all". Recommendations R1–R10 in `docs/41_OPEN_QUESTION_REVIEW.md` §4 are approved without overrides.
+
+Decisions:
+- R1 OQ-02: 5 failed logins / 15 min per username + IP → 429, no lockout.
+- R2 OQ-05: no self role/status change by an ADMIN.
+- R3 OQ-10: PUBLIC problems require an active class membership for students (code brought in line with REQ-PROB-003).
+- R4 OQ-01 exam: one ACTIVE exam session per participation and problem (resume).
+- R5 OQ-01 practice / OQ-13: new session per open; stale practice sessions (24 h without activity) → ABANDONED.
+- R6 OQ-13: server contract as built; client contract for the frontend.
+- R7 OQ-04, 06, 07, 08, 09, 11, 15, 23: current behaviour confirmed (OQ-23 error code renamed to EXAM_ONGOING_CANCEL_FORBIDDEN).
+- R8 OQ-03: OUT_OF_SCOPE V1. R9 OQ-12: publication = assignment, no due date. R10 OQ-24: read-only reuse.
+
+Consequence:
+No OPEN question remains. R1–R5 and the R7 rename are implemented as Phase 15A.

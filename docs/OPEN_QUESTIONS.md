@@ -18,117 +18,117 @@ Mỗi OQ gồm:
 
 ## Authentication & User Management
 
-### OQ-01 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-01 — RESOLVED (2026-10-29, docs/41 R4, R5)
 
 **Question:** Session luyện tập — mỗi lần mở bài là Session mới hay resume Session cũ?
 **Why it matters:** Session model, working_time logic, TEACHER timeline.
 **Options:** (1) New session mỗi lần mở; (2) Resume nếu trong N phút; (3) User chọn.
-**Current assumption:** Option 1 — each open = new Session. In Exam: always same Session.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Practice: each open creates a new session; a practice session with no trace activity for SESSION_STALE_HOURS (24) is ended as ABANDONED (SYSTEM_SESSION_POLICY). Exam: at most one ACTIVE session per participation and problem; starting again resumes it; a new one opens only after submit/end (docs/36 D2).
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-02 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-02 — RESOLVED (2026-10-29, docs/41 R1)
 
 **Question:** Login rate limiting — ngưỡng và behavior?
 **Why it matters:** Auth module, brute-force protection.
 **Options:** (1) 5 lần sai → 15 phút rate limit; (2) Lockout account.
-**Current assumption:** Rate limit tạm thời, không auto-lockout.
-**Owner:** Security Stakeholder | **Status:** OPEN
+**Decision:** Per username + client IP: 5 failed logins within 15 minutes → 429 LOGIN_RATE_LIMITED for 15 minutes; no account lockout; a successful login resets the counter.
+**Owner:** Security Stakeholder | **Status:** RESOLVED
 
 ---
 
-### OQ-03 — OPEN | NON_BLOCKING_V1
+### OQ-03 — RESOLVED (2026-10-29, docs/41 R8)
 
 **Question:** Email notification khi tạo tài khoản — bắt buộc hay optional?
-**Current assumption:** Optional trong V1.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** OUT_OF_SCOPE V1. The admin hands over a temporary password; the user must change it at first login.
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-04 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-04 — RESOLVED (2026-10-29, docs/41 R7)
 
 **Question:** Có cho phép khóa ADMIN duy nhất còn lại không?
-**Current assumption:** Không cho phép.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Confirmed: the last usable ADMIN cannot be locked or demoted (400 LAST_ADMIN_PROTECTED).
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-05 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-05 — RESOLVED (2026-10-29, docs/41 R2)
 
 **Question:** ADMIN có thể đổi role của chính mình không?
-**Current assumption:** Không cho phép tự đổi.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** An ADMIN cannot change their own role or status (403 SELF_MODIFICATION_FORBIDDEN); another admin must do it.
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-06 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-06 — RESOLVED (2026-10-29, docs/41 R7)
 
 **Question:** Danh sách đầy đủ threshold có thể cấu hình ngoài idle_threshold_minutes?
-**Current assumption:** Chỉ idle_threshold_minutes trong V1. LOC anomaly không có absolute threshold.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Confirmed: only idle_threshold_minutes is admin-configurable in V1 (Phase 13); LOC anomaly stays relative.
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
 ## Class Management
 
-### OQ-07 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-07 — RESOLVED (2026-10-29, docs/41 R7)
 
 **Question:** Có cho phép trùng tên lớp của cùng một TEACHER không?
-**Current assumption:** Cho phép (unique theo id).
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Confirmed: duplicate class names per teacher are allowed.
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-08 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-08 — RESOLVED (2026-10-29, docs/41 R7)
 
 **Question:** Enrollment có cần TEACHER duyệt không?
-**Current assumption:** Tự động approved.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Confirmed: enrollment by invite code is auto-approved.
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
 ## Problem Management
 
-### OQ-09 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-09 — RESOLVED (2026-10-29, docs/41 R7)
 
 **Question:** Problem không có test case — cho lưu draft?
-**Current assumption:** Cho lưu draft; validate khi publish.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Confirmed: a problem without test cases can be saved; exam publish requires test cases; submit is refused (422).
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-10 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-10 — RESOLVED (2026-10-29, docs/41 R3)
 
 **Question:** Problem visibility PUBLIC — mọi STUDENT enrolled hay mọi STUDENT?
-**Current assumption:** Mọi STUDENT enrolled ít nhất 1 lớp.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** PUBLIC problems are visible to students with at least one active class membership (REQ-PROB-003) and to all teachers.
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-11 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-11 — RESOLVED (2026-10-29, docs/41 R7)
 
 **Question:** Exam DRAFT không có problem — save được không?
-**Current assumption:** Save DRAFT; không publish nếu 0 problem.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Confirmed: a DRAFT exam without problems can be saved; publish is refused (422).
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-12 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-12 — RESOLVED (2026-10-29, docs/41 R9)
 
 **Question:** Assignment (gán bài ngoài kỳ thi) — flow chi tiết?
-**Current assumption:** Chưa đủ thông tin; SHOULD trong backlog.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** V1: publishing a CLASS problem to a class is the assignment; no due date.
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
 ## Coding & Trace
 
-### OQ-13 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-13 — RESOLVED (2026-10-29, docs/41 R6)
 
 **Question:** Session recovery khi STUDENT disconnect — cơ chế cụ thể?
-**Current assumption:** Client buffer + retry; server idempotent batch insert.
-**Owner:** Tech Lead | **Status:** OPEN
+**Decision:** Server: idempotent batch ingest by (session_id, sequence_number) plus trace-state resync. Client contract (frontend): buffer locally, resend with the same sequence numbers, resync from trace-state after reconnect. Abandoned practice sessions are closed by the stale policy (OQ-01).
+**Owner:** Tech Lead | **Status:** RESOLVED
 
 ---
 
@@ -153,11 +153,11 @@ Mỗi OQ gồm:
 
 ---
 
-### OQ-15 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-15 — RESOLVED (2026-10-29, docs/41 R7)
 
 **Question:** Permission xem lịch sử submission của STUDENT — ai cấp, điều kiện?
-**Current assumption:** Mặc định cho xem ngoài kỳ thi; trong kỳ thi xem sau Exam ENDED + allow_view_result_after=true.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Confirmed: docs/36 D14 (practice always; exam after ENDED + allow_view_result_after).
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
@@ -290,19 +290,19 @@ Mỗi OQ gồm:
 
 ## New Questions Added in v0.2 Remediation
 
-### OQ-23 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-23 — RESOLVED (2026-10-29, docs/41 R7)
 
 **Question:** Admin emergency exam cancellation — ADMIN có cancel Exam ONGOING không?
-**Current assumption:** ADMIN không cancel ONGOING trong V1. Xem NG12.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** ADMIN does not cancel ONGOING exams in V1 (409 EXAM_ONGOING_CANCEL_FORBIDDEN).
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
-### OQ-24 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-24 — RESOLVED (2026-10-29, docs/41 R10)
 
 **Question:** Cross-teacher PUBLIC problem reuse/copy?
-**Current assumption:** Chưa xác định.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** V1: teachers may read other teachers' PUBLIC problem statements only (no test cases, no copy, no attach).
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
@@ -346,6 +346,22 @@ Mỗi OQ gồm:
 | OQ-16 | Points mechanism | RESOLVED — practice-only, once per problem, by difficulty, no leaderboard (docs/40) |
 | OQ-26 | Production judge isolation | RESOLVED — dedicated judge VM + gVisor + least-privilege DB role (docs/40) |
 | OQ-27 | `duration_minutes` meaning | RESOLVED — min(started_at + duration, end_time) (docs/40) |
+| OQ-01 | Practice: each open creates a new session; a practice session with no trace acti | RESOLVED (docs/41) |
+| OQ-02 | Per username + client IP: 5 failed logins within 15 minutes → 429 LOGIN_RATE_LIM | RESOLVED (docs/41) |
+| OQ-03 | OUT_OF_SCOPE V1 | RESOLVED (docs/41) |
+| OQ-04 | Confirmed: the last usable ADMIN cannot be locked or demoted (400 LAST_ADMIN_PRO | RESOLVED (docs/41) |
+| OQ-05 | An ADMIN cannot change their own role or status (403 SELF_MODIFICATION_FORBIDDEN | RESOLVED (docs/41) |
+| OQ-06 | Confirmed: only idle_threshold_minutes is admin-configurable in V1 (Phase 13); L | RESOLVED (docs/41) |
+| OQ-07 | Confirmed: duplicate class names per teacher are allowed | RESOLVED (docs/41) |
+| OQ-08 | Confirmed: enrollment by invite code is auto-approved | RESOLVED (docs/41) |
+| OQ-09 | Confirmed: a problem without test cases can be saved; exam publish requires test | RESOLVED (docs/41) |
+| OQ-10 | PUBLIC problems are visible to students with at least one active class membershi | RESOLVED (docs/41) |
+| OQ-11 | Confirmed: a DRAFT exam without problems can be saved; publish is refused (422) | RESOLVED (docs/41) |
+| OQ-12 | V1: publishing a CLASS problem to a class is the assignment; no due date | RESOLVED (docs/41) |
+| OQ-13 | Server: idempotent batch ingest by (session_id, sequence_number) plus trace-stat | RESOLVED (docs/41) |
+| OQ-15 | Confirmed: docs/36 D14 (practice always; exam after ENDED + allow_view_result_af | RESOLVED (docs/41) |
+| OQ-23 | ADMIN does not cancel ONGOING exams in V1 (409 EXAM_ONGOING_CANCEL_FORBIDDEN) | RESOLVED (docs/41) |
+| OQ-24 | V1: teachers may read other teachers' PUBLIC problem statements only (no test ca | RESOLVED (docs/41) |
 
 ---
 
@@ -353,6 +369,5 @@ Mỗi OQ gồm:
 
 | Phase Blocked | OQ-IDs |
 |---------------|--------|
-| BLOCKING_IMPLEMENTATION | OQ-01, 02, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 15, 23, 24 |
-| NON_BLOCKING_V1 | OQ-03 |
+| BLOCKING_IMPLEMENTATION | **None remaining** ✓ |
 | BLOCKING_ARCHITECTURE | **None remaining** ✓ |
