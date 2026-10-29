@@ -1,7 +1,7 @@
 # 45 — RETENTION PURGE (PHASE 19 / STEP 3) SPECIFICATION
 
 > **Module:** configurable deletion of raw trace data and expired operational rows
-> **Status:** DRAFT — awaiting Project Owner approval of §6
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-17-observability-locked` (`4300655`, = `main`)
 > **Proposed Branch:** `phase19`
