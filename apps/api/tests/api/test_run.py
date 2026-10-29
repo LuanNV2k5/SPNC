@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-PHASE07_DB_URL = "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase07_judge_test"
+PHASE07_DB_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase07_judge_test")
 os.environ["DATABASE_URL"] = PHASE07_DB_URL
 
 from app.main import app
@@ -55,7 +55,7 @@ def setup_database():
     import psycopg2
     from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
     try:
-        conn = psycopg2.connect("postgresql://spnc_test:spnc_test_password@localhost:5432/postgres")
+        conn = psycopg2.connect(PHASE07_DB_URL.rsplit("/", 1)[0] + "/postgres")
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cur = conn.cursor()
         cur.execute(f"DROP DATABASE IF EXISTS {EXPECTED_DB_NAME}")

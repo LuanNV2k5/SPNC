@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-PHASE07_DB_URL = "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase07_judge_test"
+PHASE07_DB_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase07_judge_test")
 engine = create_engine(PHASE07_DB_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

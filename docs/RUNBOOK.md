@@ -90,3 +90,59 @@ The core stack (API, PostgreSQL, Redis, MinIO, reconciler, schedulers) runs **wi
 6. **Check:** submit a practice solution and confirm the worker log shows the job and the submission ends `COMPLETED`. `docker inspect` on a running sandbox should show `"Runtime": "runsc"`.
 
 Add more judge VMs to scale; each pulls jobs from the same Redis queue, and the CAS fencing (Phase 07/10A) keeps one result per job.
+
+## 9. Backup and restore (docs/44)
+A backup **set** is one directory `spnc-<UTC time>` holding `db.dump` (PostgreSQL, `pg_dump` custom format), `blobs/` (every snapshot blob the dump references) and `manifest.json` (alembic revision, row count per table, SHA-256 of the dump and of every blob). The key list and the dump come from one database snapshot, and every blob is hash-checked, so a set never restores rows that point at missing code.
+
+### 9.1 Scheduled backups
+The `backup` service runs one backup a day at `BACKUP_TIME_UTC` (default `19:00` UTC = 02:00 Asia/Ho_Chi_Minh) into `BACKUP_DIR` (default `./backups`, git-ignored) and keeps the newest `BACKUP_KEEP` sets (default 14). This meets RPO 24 h (OQ-20).
+```bash
+docker compose logs backup               # "Backup spnc-…: … rows in … tables, … blobs"
+cat backups/last-backup.json             # status of the last run: ok / failed + error
+```
+A failed run leaves no set (only a `.partial` directory, removed by the next run) and writes `"status": "failed"` with the reason. A referenced blob missing from MinIO is a failure, never skipped.
+
+### 9.2 Manual backup, list, check
+```bash
+docker compose run --rm backup backup
+docker compose run --rm backup list
+docker compose run --rm backup verify-set spnc-20261029T190000Z
+docker compose run --rm backup verify-live      # every object_key of the live DB is readable and matches its hash
+```
+
+### 9.3 Off-host copy (required, docs/44 D7)
+Sets live on the same disk as the volumes, so they do not survive the loss of the host. Copy each new set off the host, **encrypted**: sets contain personal data (trace events, audit log, password hashes). For example:
+```bash
+tar -C backups -cf - spnc-20261029T190000Z | age -r <recipient public key> > spnc-20261029T190000Z.tar.age
+```
+Keep the decryption key somewhere other than the backups. Data removed by the retention purge stays in backups until the set expires: effective retention is 180 days + `BACKUP_KEEP` days (OQ-21, docs/44 F8).
+
+### 9.4 Restore (RTO 4 h)
+Restore writes only into an **empty** database and bucket; it refuses anything else.
+1. Stop the stack and keep the broken volumes aside if they may be needed for analysis; otherwise remove them:
+   ```bash
+   docker compose down -v
+   ```
+   On a new host: install Docker, check out the repository at the release that made the set, and create `.env` (§2).
+2. Put the set (decrypted, unpacked) in `BACKUP_DIR`.
+3. Start only storage, then restore:
+   ```bash
+   docker compose up -d postgres minio-init minio
+   docker compose run --rm --no-deps backup restore spnc-20261029T190000Z
+   ```
+   It checks the set, uploads the blobs, then restores the database in one transaction, and finally compares the alembic revision, every table's row count and every `object_key` against the manifest. It prints `RESTORE OK`; on any mismatch it exits non-zero: do not start the stack.
+4. Start everything; `migrate` is a no-op at the same revision (it upgrades if the code is newer):
+   ```bash
+   docker compose up -d
+   docker compose run --rm --no-deps backup verify-live
+   ```
+5. Production judge host only (§8): roles are not part of the dump. Re-run `deploy/sql/judge_worker_role.sql` and set the `spnc_judge` password again.
+6. Smoke test (§5). Users must log in again only if their refresh tokens are newer than the set.
+
+Data written after the set was taken (at most 24 h) is lost; clients retry trace batches that were not acknowledged (docs/11 F01).
+
+### 9.5 Restore drill
+```bash
+PYTHON=apps/api/venv/Scripts/python deploy/backup/drill.sh     # Linux/macOS: PYTHON=python3
+```
+On its own compose project (`spnc-drill`, API port 8018, console 9018; never the demo stack): starts a stack, seeds data (compose E2E + a drill teacher/class/submission), backs up, destroys every volume, restores into an empty stack, verifies, reads the seeded snapshot back through the teacher API, re-judges it, runs the compose E2E again and prints the restore time. CI runs it nightly and on demand (`backup-drill` job). Run it after any change to the schema or to the backup tool.

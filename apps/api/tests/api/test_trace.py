@@ -10,7 +10,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 # --- MUST set DATABASE_URL before app import ---
-PHASE06_DB_URL = "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase06_trace_test"
+PHASE06_DB_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase06_trace_test")
 os.environ["DATABASE_URL"] = PHASE06_DB_URL
 
 from app.main import app
