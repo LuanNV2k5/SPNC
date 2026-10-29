@@ -72,6 +72,10 @@ jobs:
           docker pull python:3.10-slim
           docker pull gcc:12
 
+      - name: Every test file is in a group
+        if: matrix.group == 'auth'
+        run: bash scripts/ci/regression.sh mapping
+
       - name: Regression (${{ matrix.group }})
         env:
           PYTHON: python

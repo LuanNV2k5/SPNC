@@ -2,6 +2,7 @@
 # SPNC backend regression runner (docs/42 §3.1). Used by CI and locally.
 #
 #   scripts/ci/regression.sh [group]      group: auth | academic | judge | signals | observation | phase10plus | all
+#   scripts/ci/regression.sh mapping      check that every test file belongs to a group
 #
 # Environment:
 #   PYTHON   Python with apps/api/requirements.txt installed (default: python)
@@ -75,6 +76,18 @@ EOF
     *) echo "unknown group: $1" >&2; return 1 ;;
   esac
 }
+
+if [ "$GROUP" = "mapping" ]; then
+  # Every test file must belong to a group, or CI would silently skip it (e2e needs a running stack)
+  MAPPED="$(for g in auth academic judge signals observation phase10plus; do group_files "$g"; done | awk '{print $1}' | sort -u)"
+  ALL="$(find tests -name 'test_*.py' -not -path 'tests/e2e/*' | sort)"
+  MISSING="$(comm -23 <(echo "$ALL") <(echo "$MAPPED"))"
+  if [ -n "$MISSING" ]; then
+    echo "Test files not assigned to any regression group:"; echo "$MISSING"; exit 1
+  fi
+  echo "All $(echo "$ALL" | grep -c .) test files are assigned to a regression group."
+  exit 0
+fi
 
 if [ "$GROUP" = "all" ]; then
   GROUPS_TO_RUN="auth academic judge signals observation phase10plus"
