@@ -164,4 +164,27 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 
 ## 7. Verification Record
 
-_Empty until implementation._
+### 7.1 Changes (2026-10-29)
+| Commit | Content |
+|---|---|
+| `00ff2bf` | This specification (draft) |
+| `c7bc7bc` | Spec approval (PROJECT_PROVENANCE_LOG) |
+| `09d6a59` | Migration `c3e7a1f5d920` (`coding_sessions.trace_purged_at`, `exams.retention_hold`, partial index `ix_coding_sessions_purge_candidates`); `app/services/retention.py`; `system_settings.retention_days()` (unset → `RETENTION_DEFAULT_DAYS`); CLI `retention-purge`; `reconciler.maybe_purge_retention`; `PUT /api/v1/admin/exams/{id}/retention-hold` (+ `retention_hold` on admin exam reads); `trace_purged_at` on observed session items (timeline and session list); settings `RETENTION_PURGE_ENABLED`, `RETENTION_PURGE_INTERVAL_SECONDS`, `RETENTION_PURGE_BATCH_SIZE`, `RETENTION_PURGE_MAX_BATCHES`, `RETENTION_DEFAULT_DAYS`, `RETENTION_MIN_DAYS`, `REFRESH_TOKEN_PURGE_GRACE_DAYS`; metrics §3.7; `tests/api/test_phase19_retention.py` (13 tests, group `phase10plus`); `test_phase13b_idle_threshold.py` default 30 → 180 (D7) |
+| `54627dc` | Merge of `main` (Phase 18) |
+| `2c2b899` | RUNBOOK §10 "Retention purge" |
+
+### 7.2 Implementation Notes (within the approved decisions)
+- **`latest_activity` fallback (§3.6) not needed.** `latest_activity()` is read only for the ACTIVE session of an exam participant (`services/observation.py`, exam observation), and ACTIVE sessions are never purged. No change was made.
+- **Refresh tokens** are deleted in chunks of `10 × RETENTION_PURGE_BATCH_SIZE`, with one `RETENTION_PURGE` audit row (`target_type=REFRESH_SESSIONS`, count only) per chunk. `refresh_sessions.expires_at` is a naive UTC column, so the cutoff is compared as naive UTC.
+- **Audit row** for a session batch: `target_type=CODING_SESSION_BATCH`, `target_id` = number of sessions, `metadata_payload` = `retention_days`, `cutoff`, per-class counts and `session_ids`.
+- **Locking.** `pg_try_advisory_xact_lock(45190001)` at the start of each batch transaction. If another purge holds it, this run stops and changes nothing. Session rows are taken `FOR UPDATE SKIP LOCKED`.
+- **Dry run** counts every eligible session. An apply is bounded by `max_batches × batch_size`, so the two counts match only when everything eligible fits in one apply (AC-19-04 is tested that way).
+- **Phase 18 interplay.** Backups copy only blobs that rows reference, so a purged blob is absent from later sets, and the purge never makes a set inconsistent. A restore from a set older than a purge brings the rows back. RUNBOOK §10 says to run the purge again.
+
+### 7.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| AC-19-01…10 `test_phase19_retention.py` | this machine, own PostgreSQL 16 on port 55434, memory storage backend | **13 passed** |
+| Migration `c3e7a1f5d920` up / down / up | same, empty database | OK; single Alembic head |
+| Full local regression `regression.sh all` after merging `main` (Phase 18) | same (`PG_BASE` on port 55434, every group isolated) | **593 passed, 0 failed** (47 files; 580 before this phase + 13) |
+| AC-19-11 CI on the PR | GitHub-hosted | _pending_ |
