@@ -147,3 +147,38 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
+
+  # Restore drill (docs/44 D6): backup, destroy, restore into an empty stack, verify. Not a required check.
+  backup-drill:
+    name: backup drill
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Install test dependencies
+        run: pip install -r apps/api/requirements.txt
+
+      - name: Pull images
+        run: bash scripts/ci/pull_with_retry.sh python:3.10-slim gcc:12 postgres:16-alpine
+
+      - name: Restore drill
+        env:
+          PYTHON: python
+          DRILL_KEEP: "1"   # the next steps read logs, then tear down
+        run: bash deploy/backup/drill.sh
+
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose -p spnc-drill --env-file .drill/spnc-drill/.env logs --tail 200 backup api worker migrate
+
+      - name: Tear down
+        if: always()
+        run: docker compose -p spnc-drill --env-file .drill/spnc-drill/.env down -v || true

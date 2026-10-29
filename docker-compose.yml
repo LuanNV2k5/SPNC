@@ -72,7 +72,7 @@ services:
     volumes:
       - miniodata:/data
     ports:
-      - "127.0.0.1:9001:9001"   # console, local only
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"   # console, local only
     depends_on:
       minio-init:
         condition: service_completed_successfully
@@ -115,6 +115,30 @@ services:
   exam-scheduler:
     <<: *app
     command: ["python", "-m", "app.exam_scheduler"]
+
+  backup:
+    # Daily consistent backup of PostgreSQL + referenced snapshot blobs (docs/44). Manual runs,
+    # restore and the drill use the same image: see docs/RUNBOOK.md §9.
+    build: ./deploy/backup
+    image: spnc-backup:local
+    restart: unless-stopped
+    command: ["schedule"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      S3_ENDPOINT: minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-spnc-snapshots}
+      S3_SECURE: "false"
+      BACKUP_TIME_UTC: ${BACKUP_TIME_UTC:-19:00}   # 02:00 Asia/Ho_Chi_Minh (docs/44 D2)
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}              # docs/44 D5
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
 
 volumes:
   pgdata:
