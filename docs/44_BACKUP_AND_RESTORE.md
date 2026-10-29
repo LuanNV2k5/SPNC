@@ -1,7 +1,7 @@
 # 44 — BACKUP & RESTORE (PHASE 18 / STEP 3) SPECIFICATION
 
 > **Module:** Consistent backup of PostgreSQL + snapshot blobs, scripted restore, restore drill
-> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md)
+> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-18-backup-locked`, on the merge commit of the lock PR)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-16-ci-locked` (`0ad5a9b`, = `main`)
 > **Proposed Branch:** `phase18`
