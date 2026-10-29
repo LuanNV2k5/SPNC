@@ -95,6 +95,16 @@ services:
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
 
+  web:
+    # Web client + same-origin reverse proxy to the API (docs/46 §3.7, D6/D13)
+    build: ./apps/web
+    image: spnc-web:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    depends_on:
+      - api
+
   worker:
     <<: *app
     command: ["python", "-m", "app.worker"]

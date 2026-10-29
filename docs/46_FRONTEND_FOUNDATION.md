@@ -170,9 +170,23 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 | Commit | Content |
 |---|---|
 | `ce0b0b0` | This specification (draft) |
+| `09fb721` | Spec approval (PROJECT_PROVENANCE_LOG) |
+| `ce303c1` | `apps/web` scaffold (exact pins, ESLint rule for `src/trace`), `scripts/web/dump_openapi.py`, committed `openapi.json` + `src/api/schema.d.ts`, trace module (`recorder`, IndexedDB `store`, `payloads`, `backoff`, `lock`) with Vitest tests |
+| `e356c65` | API client (`X-Request-ID`, 401 → refresh → one retry), cross-tab single-flight refresh (Web Locks), error display, Vietnamese strings, routing and guards, login, forced password change, practice list, problem page, Monaco workspace (trace capture, checkpoint, run, submit, end, resume per D10) |
+| _(next commit)_ | `apps/web/Dockerfile` + `nginx.conf`, compose service `web`, `WEB_PORT` in `.env.example`; CI job `web` and `ci needs: [tests, web]`; Playwright step in `compose-e2e`; client contract fixture + `tests/api/test_phase20a_trace_contract.py` (group `phase10plus`); Playwright tests; RUNBOOK §11; `apps/web/README.md` |
 
 ### 7.2 Implementation Notes (within the approved decisions)
-_None yet._
+- **Versions.** The newest release of each major line that is known to work together: React 19.3.1, React Router 7.18.5, TanStack Query 5.105.0, Mantine 8.3.18, Vite 7.3.7, Vitest 4.1.12 (3.x has audit findings in `@vitest/mocker`/`tinypool`), TypeScript 5.9.3 (`openapi-typescript` 7 requires TypeScript 5), ESLint 10.13.0, `monaco-editor` 0.52.2, `openapi-fetch` 0.17.0, `openapi-typescript` 7.13.0, Playwright 1.64.1. `npm audit`: 0 vulnerabilities. CI uses Node 22.
+- **Browser E2E placement (D11).** The Playwright tests run as a step of the existing `compose-e2e` job (same stack, same cadence: push to `main`, nightly, dispatch) rather than in a separate `web-e2e` job, so the stack is built once. The report is uploaded on failure.
+- **Submit ends the session.** The server appends `SUBMISSION_CREATED` and then `SESSION_ENDED`; the client flushes before submit and calls `finish()` afterwards, which deletes the session's local data.
+- **Trace fidelity.** Monaco's auto-indent whitespace is recorded as typed. The E2E tests therefore compare the replay of the server trace with the submitted (or run) snapshot content **exactly**, not with the rendered editor text.
+- **Input source.** Paste is detected by a capturing DOM `paste` listener on the editor; undo/redo map to `other`; `isFlush` changes (initial content) are not recorded.
+- **`PROBLEM_OPENED`** is recorded when the recorder opens a session with no events yet (a fresh session).
+- **Run output.** `RunResponse` has no top-level stdout; the workspace shows `stdout`, `stderr`, `compile_error_message`, `runtime_error_message` from `testcase_results` when present.
+- **Paths not proxied.** Through `web`, `/docs`, `/openapi.json`, `/health`, `/ready`, `/metrics` return the SPA shell (200 `text/html`), never the API.
+- **Resume edge.** If a session's metadata is in IndexedDB but its draft is not yet written (closed within 1 s of the first keystroke), the editor resumes empty while the server trace has that keystroke. Accepted for 20A; a student snapshot-read endpoint (backend follow-up, §3.10) removes it.
+- **Offline reload.** There is no service worker, so a reload with the network fully down cannot load the app shell; recovery happens on the next load. The E2E test simulates the failure by aborting only the ingest requests.
+- **Bundle size.** The full Monaco build is bundled (main chunk about 1 MB gzip). Loading only the C++/Python contributions is deferred.
 
 ### 7.3 Verification
 | Check | Environment | Result |
