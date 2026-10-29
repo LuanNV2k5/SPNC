@@ -552,3 +552,21 @@ Each phase branch was merged forward into the next (phase10 → phase11 → phas
 
 Open after lock:
 OQ-16 (points, blocks REQ-STU-004), OQ-26 (production judge isolation), OQ-27 (`duration_minutes` meaning), frontend.
+
+---
+
+## Decision: OQ-16, OQ-26, OQ-27 Resolution (Phase 14)
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_DECISION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve all". Recommendations Q1–Q5 in `docs/40_OPEN_QUESTION_DECISIONS.md` §5 are approved without overrides.
+
+Decisions:
+- Q1–Q3 (OQ-16, REQ-STU-004): practice-only points, once per problem at the first ACCEPTED submission, EASY 10 / MEDIUM 20 / HARD 30 / none 10; cumulative, never reset; no leaderboard; exam submissions never award points.
+- Q4 (OQ-26): dedicated judge VM with its own Docker daemon, gVisor runtime for sandboxes, least-privilege PostgreSQL role for the worker; the socket-mount compose stack remains demo/dev only.
+- Q5 (OQ-27): deadline = min(started_at + duration_minutes, end_time); confirms docs/38 D7.

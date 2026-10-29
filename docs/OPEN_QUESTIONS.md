@@ -161,11 +161,11 @@ Mỗi OQ gồm:
 
 ---
 
-### OQ-16 — OPEN | BLOCKING_IMPLEMENTATION
+### OQ-16 — RESOLVED (2026-10-29, docs/40 Q1–Q3)
 
 **Question:** Cơ chế tích điểm — dùng để làm gì, reset thế nào?
-**Current assumption:** Chưa đủ thông tin; SHOULD trong backlog.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Practice only; points once per problem at the first ACCEPTED submission (EASY 10, MEDIUM 20, HARD 30, no difficulty 10); cumulative, never reset; visible to the student and to teachers of their classes; no leaderboard. Exam submissions never award points.
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
@@ -306,19 +306,19 @@ Mỗi OQ gồm:
 
 ---
 
-### OQ-26 — OPEN | BLOCKING_DEPLOYMENT
+### OQ-26 — RESOLVED (2026-10-29, docs/40 Q4)
 
 **Question:** Production isolation of the judge zone (docs/10 §2): how does the judge worker reach a container runtime without host-root-equivalent access (rootless Docker, dedicated judge host/VM, gVisor/Kata, remote Docker over TLS)?
-**Current assumption:** Demo/dev compose mounts the host Docker socket into the `worker` container (docs/37 D3); not production-grade.
-**Owner:** Tech Lead / Security Stakeholder | **Status:** OPEN
+**Decision:** Production judge workers run on a dedicated judge host (VM) with its own Docker daemon; the core zone exposes no container runtime; sandbox containers use the gVisor runtime (`runsc`, setting `JUDGE_CONTAINER_RUNTIME`); the worker uses a least-privilege PostgreSQL role. The socket-mount compose stack stays demo/dev only.
+**Owner:** Tech Lead / Security Stakeholder | **Status:** RESOLVED
 
 ---
 
-### OQ-27 — OPEN | NON_BLOCKING_V1
+### OQ-27 — RESOLVED (2026-10-29, docs/40 Q5)
 
 **Question:** What does `Exam.duration_minutes` mean (REQ-EXAM-001; not defined in docs 01–03)?
-**Current assumption (docs/38 D7):** Optional per-student limit; deadline = `min(participation.started_at + duration_minutes, end_time)`; null = no per-student limit.
-**Owner:** Product Owner | **Status:** OPEN
+**Decision:** Optional per-student limit; deadline = `min(participation.started_at + duration_minutes, end_time)`; null = no per-student limit. (confirms docs/38 D7).
+**Owner:** Product Owner | **Status:** RESOLVED
 
 ---
 
@@ -343,6 +343,9 @@ Mỗi OQ gồm:
 | OQ-21 | Data privacy baseline | RESOLVED — 180 days configurable, non-GDPR-certified |
 | OQ-22 | Supported languages | RESOLVED — CPP17, PYTHON3 |
 | OQ-25 | Forgot password | RESOLVED — OUT_OF_SCOPE V1 |
+| OQ-16 | Points mechanism | RESOLVED — practice-only, once per problem, by difficulty, no leaderboard (docs/40) |
+| OQ-26 | Production judge isolation | RESOLVED — dedicated judge VM + gVisor + least-privilege DB role (docs/40) |
+| OQ-27 | `duration_minutes` meaning | RESOLVED — min(started_at + duration, end_time) (docs/40) |
 
 ---
 
@@ -350,7 +353,6 @@ Mỗi OQ gồm:
 
 | Phase Blocked | OQ-IDs |
 |---------------|--------|
-| BLOCKING_IMPLEMENTATION | OQ-01, 02, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 15, 16, 23, 24 |
-| NON_BLOCKING_V1 | OQ-03, 27 |
-| BLOCKING_DEPLOYMENT | OQ-26 |
+| BLOCKING_IMPLEMENTATION | OQ-01, 02, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 15, 23, 24 |
+| NON_BLOCKING_V1 | OQ-03 |
 | BLOCKING_ARCHITECTURE | **None remaining** ✓ |
