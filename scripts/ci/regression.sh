@@ -121,7 +121,9 @@ TOTAL_PASSED=0
 SUMMARY=""
 while read -r file db; do
   [ -z "$file" ] && continue
-  out="$(DATABASE_URL="$PG_BASE/$db" TEST_DATABASE_URL="$PG_BASE/$db" "$PYTHON" -m pytest "$file" -q -p no:warnings 2>&1)"
+  # Phase 08E-10 files read their own variables (default localhost:5432): point them at PG_BASE too
+  url="$PG_BASE/$db"
+  out="$(DATABASE_URL="$url" TEST_DATABASE_URL="$url" PHASE08E_DATABASE_URL="$url" PHASE09_DATABASE_URL="$url"     PHASE10_DATABASE_URL="$url" "$PYTHON" -m pytest "$file" -q -p no:warnings 2>&1)"
   rc=$?
   last="$(echo "$out" | tail -1)"
   passed="$(echo "$last" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' || echo 0)"

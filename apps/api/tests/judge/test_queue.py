@@ -9,7 +9,7 @@ from app.services.queue import judge_queue
 import redis
 from app.core.config import settings
 
-PHASE07_DB_URL = "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase07_judge_test"
+PHASE07_DB_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase07_judge_test")
 engine = create_engine(PHASE07_DB_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-TEST_DB_URL = "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase04_admin_test"
+TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase04_admin_test")
 os.environ["DATABASE_URL"] = TEST_DB_URL
 
 from app.main import app
@@ -25,7 +25,7 @@ def assert_safe_phase04_test_database(db_url: str):
     if db_name != "spnc_phase04_admin_test":
         raise ValueError(f"UNSAFE DATABASE: {db_name}")
 
-TEST_DB_URL = "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase04_admin_test"
+TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase04_admin_test")
 engine = create_engine(TEST_DB_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

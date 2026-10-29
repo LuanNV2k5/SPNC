@@ -18,7 +18,7 @@ from app.core.security import get_password_hash
 from app.api.deps import require_active_user, require_admin, require_student
 from app.models.user import User, RoleEnum, AccountStatus, RefreshSession
 
-TEST_DB_URL = "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase03_auth_test"
+TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://spnc_test:spnc_test_password@localhost:5432/spnc_phase03_auth_test")
 
 engine = create_engine(TEST_DB_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
