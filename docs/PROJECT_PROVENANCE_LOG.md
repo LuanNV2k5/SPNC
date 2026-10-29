@@ -675,3 +675,19 @@ Correction:
 The Phase 15A baseline is 536 passed (the "536 + 8" in the Phase 15A lock entry counted the re-run file twice); see docs/42 §7.3.
 
 First phase locked under branch protection: the lock commit reached `main` through a pull request with `ci` green.
+
+---
+
+## Decision: Phase 18 Backup & Restore Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve both" (reply to "Approve all recommendations in both specs?", covering docs/43 Phase 17 and docs/44 Phase 18). All recommendations D1–D7 in `docs/44_BACKUP_AND_RESTORE.md` §7 are approved without overrides.
+
+Approved Decisions (summary):
+D1 daily logical `pg_dump --format=custom` (WAL/PITR is the upgrade path); D2 daily at 19:00 UTC, configurable `BACKUP_TIME_UTC`, plus manual runs; D3 key list and dump from one exported snapshot, copy only referenced blobs with hash check, a missing blob fails the backup; D4 `backup` service in `docker-compose.yml`; D5 self-contained set per backup in `${BACKUP_DIR:-./backups}`, keep newest 14, effective retention 180 + 14 days documented; D6 restore drill script run now and as a nightly/on-demand CI job (not a required check); D7 no tool-level encryption in V1, `0700` directory, runbook requires an encrypted off-host copy.

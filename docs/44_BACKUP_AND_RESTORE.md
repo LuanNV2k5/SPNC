@@ -1,7 +1,7 @@
 # 44 — BACKUP & RESTORE (PHASE 18 / STEP 3) SPECIFICATION
 
 > **Module:** Consistent backup of PostgreSQL + snapshot blobs, scripted restore, restore drill
-> **Status:** DRAFT — awaiting Project Owner approval of §7
+> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-16-ci-locked` (`0ad5a9b`, = `main`)
 > **Proposed Branch:** `phase18`
@@ -132,7 +132,7 @@ Runs on its own compose project (default `spnc-drill`, own ports and volumes; ne
 | **D6** | Restore drill | (a) `deploy/backup/drill.sh` run once now on this machine (recorded here) and as a CI job on the nightly schedule and on demand; (b) only now, manually; (c) also on every PR | **(a)**. Proves restorability continuously without slowing PRs (builds the stack twice, like `compose-e2e`). Additive job in `ci.yml`, not a required check. |
 | **D7** | Encryption and off-host copy | (a) no tool-level encryption in V1: sets inherit the host's disk protection (same as the live volumes), directory created `0700`; the runbook requires an encrypted off-host copy (e.g. `age`/`gpg` or an encrypted remote) operated by the deployment; (b) built-in symmetric encryption (`age` with a passphrase from `.env`) of every set; (c) none, no guidance | **(a)** for the demo/V1 stack. (b) adds key management that must itself be backed up; worth doing when a real deployment copies sets to third-party storage. |
 
-Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md`. No code is written before approval.
+Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md`.
 
 ---
 
