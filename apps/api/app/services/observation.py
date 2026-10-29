@@ -11,6 +11,7 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.models.exam import ExamStatus, ParticipationStatus
 from app.models.session import CodingSession, SessionStatus
 from app.models.user import User
@@ -106,6 +107,8 @@ def get_snapshot(db: Session, teacher: User, class_id: uuid.UUID, student_id: uu
     if not snap:
         raise HTTPException(status_code=404, detail=_error("SNAPSHOT_NOT_FOUND", "Snapshot not found in this session"))
     available = storage_adapter.exists_code_snapshot(snap.object_key)
+    if not available:
+        metrics.SNAPSHOT_BLOB_MISSING.labels(reader="observation").inc()
     return {
         "id": snap.id,
         "session_id": snap.session_id,

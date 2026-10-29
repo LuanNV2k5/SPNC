@@ -1,11 +1,13 @@
 import uuid
 import hashlib
 import json
+import time
 from datetime import datetime, timezone
 from typing import Tuple, List
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.models.user import User, RoleEnum
 from app.models.session import CodingSession, SessionStatus
 from app.models.trace import TraceEventType
@@ -53,6 +55,27 @@ def _generate_fingerprint(event_type: str, payload: dict) -> str:
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
 def ingest_trace_batch(db: Session, student: User, session_id: uuid.UUID, req: TraceBatchRequest) -> int:
+    # docs/43 §3.1: accepted = something new stored; duplicate = whole batch already stored (retry)
+    started = time.perf_counter()
+    try:
+        accepted = _ingest_trace_batch(db, student, session_id, req)
+    except HTTPException as e:
+        metrics.TRACE_BATCHES.labels(outcome="rejected").inc()
+        metrics.TRACE_BATCH_REJECTED.inc()
+        if isinstance(e.detail, dict) and e.detail.get("error_code") == "TRACE_SEQUENCE_CONFLICT":
+            metrics.TRACE_CONFLICTS.inc()
+        raise
+    finally:
+        metrics.TRACE_LATENCY.observe(time.perf_counter() - started)
+    if accepted:
+        metrics.TRACE_BATCHES.labels(outcome="accepted").inc()
+    else:
+        metrics.TRACE_BATCHES.labels(outcome="duplicate").inc()
+        metrics.TRACE_RETRIES.inc()
+    return accepted
+
+
+def _ingest_trace_batch(db: Session, student: User, session_id: uuid.UUID, req: TraceBatchRequest) -> int:
     session = _get_student_session(db, student, session_id)
     # docs/38 D8: exam sessions accept nothing after the participant's deadline
     assert_session_writable(db, session, datetime.now(timezone.utc))

@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import resolve_user_from_token
+from app.core import metrics
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.user import RoleEnum
@@ -49,24 +50,29 @@ async def teacher_notifications(websocket: WebSocket):
     try:
         first = await asyncio.wait_for(websocket.receive_json(), timeout=settings.WS_AUTH_TIMEOUT_SECONDS)
     except (asyncio.TimeoutError, ValueError, WebSocketDisconnect):
+        metrics.WS_AUTH_REJECTIONS.labels(reason="no_auth_message").inc()
         await websocket.close(code=CLOSE_UNAUTHENTICATED)
         return
     if not isinstance(first, dict) or first.get("type") != "auth" or not first.get("access_token"):
+        metrics.WS_AUTH_REJECTIONS.labels(reason="no_auth_message").inc()
         await websocket.close(code=CLOSE_UNAUTHENTICATED)
         return
     try:
         teacher_id, role = await run_in_threadpool(_authenticate, first["access_token"])
     except HTTPException:
+        metrics.WS_AUTH_REJECTIONS.labels(reason="invalid_token").inc()
         await websocket.close(code=CLOSE_UNAUTHENTICATED)
         return
     if role != RoleEnum.TEACHER.value:
+        metrics.WS_AUTH_REJECTIONS.labels(reason="forbidden_role").inc()
         await websocket.close(code=CLOSE_FORBIDDEN)
         return
 
     key = id(websocket)
     hub.register(key, Subscriber(teacher_id=teacher_id, send=threadsafe_sender(websocket, asyncio.get_running_loop())))
-    await websocket.send_json({"type": "authenticated"})
+    metrics.WS_ACTIVE.inc()
     try:
+        await websocket.send_json({"type": "authenticated"})
         while True:
             msg = await websocket.receive_json()
             if not isinstance(msg, dict) or msg.get("type") != "subscribe":
@@ -95,3 +101,4 @@ async def teacher_notifications(websocket: WebSocket):
         pass
     finally:
         hub.unregister(key)
+        metrics.WS_ACTIVE.dec()
