@@ -49,6 +49,8 @@ class Exam(Base, TimestampMixin):
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL", name="fk_exams_cancelled_by"), nullable=True)
     cancel_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # docs/45 D4: ADMIN hold that keeps the exam's raw trace from the retention purge
+    retention_hold: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     owner: Mapped["User"] = relationship("User", foreign_keys=[owner_id])
     exam_problems: Mapped[List["ExamProblem"]] = relationship("ExamProblem", back_populates="exam", cascade="all, delete-orphan", order_by="ExamProblem.order_index")

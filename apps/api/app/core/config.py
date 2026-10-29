@@ -101,6 +101,15 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     READY_CHECK_TIMEOUT_SECONDS: float = 2.0
 
+    # Phase 19 retention purge (docs/45): hook off by default; retention_days itself is the admin setting
+    RETENTION_PURGE_ENABLED: bool = False
+    RETENTION_PURGE_INTERVAL_SECONDS: int = 86400
+    RETENTION_PURGE_BATCH_SIZE: int = 100
+    RETENTION_PURGE_MAX_BATCHES: int = 10
+    RETENTION_DEFAULT_DAYS: int = 180   # OQ-21 / NFR-DATA-008 baseline when the admin setting is unset
+    RETENTION_MIN_DAYS: int = 30        # D7 floor: a lower setting is clamped
+    REFRESH_TOKEN_PURGE_GRACE_DAYS: int = 7
+
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 
 

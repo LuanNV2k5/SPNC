@@ -40,7 +40,7 @@ def test_admin_reads_and_changes_threshold_with_audit(db, world):
 
     r = client.patch("/api/v1/admin/settings", json={"idle_threshold_minutes": 10}, headers=h)
     assert r.status_code == 200 and r.json()["idle_threshold_minutes"] == 10
-    assert client.get("/api/v1/admin/settings", headers=h).json() == {"retention_days": 30, "idle_threshold_minutes": 10}
+    assert client.get("/api/v1/admin/settings", headers=h).json() == {"retention_days": 180, "idle_threshold_minutes": 10}
 
     log = db.scalar(select(AuditLog).where(AuditLog.action == "CONFIG_CHANGED"))
     assert log.metadata_payload == {"key": "idle_threshold_minutes", "old": DEFAULT_MIN, "new": 10}

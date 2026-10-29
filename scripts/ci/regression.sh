@@ -72,6 +72,7 @@ tests/api/test_phase14a_points.py spnc_phase10_submission_test
 tests/infra/test_judge_isolation.py spnc_phase10_submission_test
 tests/api/test_phase15a_oq_fixes.py spnc_phase10_submission_test
 tests/api/test_phase17_observability.py spnc_phase10_submission_test
+tests/api/test_phase19_retention.py spnc_phase10_submission_test
 EOF
     ;;
     *) echo "unknown group: $1" >&2; return 1 ;;

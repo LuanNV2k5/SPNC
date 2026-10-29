@@ -9,11 +9,12 @@ from app.models.exam import Exam, ExamStatus
 from app.schemas.admin import (
     AdminUserListResponse, AdminUserDetailResponse, AdminUserCreateRequest, AdminUserPatchRequest,
     AdminClassListResponse, AdminClassDetailResponse, AdminExamListResponse, AdminExamDetailResponse,
-    AdminAuditLogListResponse, AdminDashboardSummaryResponse, AdminSettingsPatchRequest, AdminSettingsResponse
+    AdminAuditLogListResponse, AdminDashboardSummaryResponse, AdminSettingsPatchRequest, AdminSettingsResponse,
+    AdminRetentionHoldRequest,
 )
 from app.repositories import admin as admin_repo
 from app.services import admin as admin_service
-from app.services import exam_lifecycle, system_settings
+from app.services import exam_lifecycle, retention, system_settings
 from app.models.user import SystemSetting
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -75,6 +76,13 @@ def cancel_exam(exam_id: uuid.UUID, db: Session = Depends(get_db), current_user:
     exam_lifecycle.admin_cancel_exam(db, current_user, exam_id)
     db.commit()
     return {"message": "Exam cancelled"}
+
+@router.put("/exams/{exam_id}/retention-hold", response_model=AdminExamDetailResponse)
+def set_retention_hold(exam_id: uuid.UUID, req: AdminRetentionHoldRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # docs/45 D4
+    exam = retention.set_retention_hold(db, current_user, exam_id, req.hold, req.reason)
+    db.commit()
+    return exam
 
 @router.get("/audit-logs", response_model=AdminAuditLogListResponse)
 def list_audit_logs(page: int = 1, size: int = 50, db: Session = Depends(get_db)):

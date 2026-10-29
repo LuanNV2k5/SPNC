@@ -34,10 +34,17 @@ def idle_threshold_seconds(db: Session) -> int:
     return idle_threshold_minutes(db) * 60
 
 
+def retention_days(db: Session) -> int:
+    """docs/45 D7: unset → the OQ-21 baseline (180 days by default), not hard-coded here."""
+    s = _get(db, RETENTION_KEY)
+    if s and isinstance(s.value, dict) and s.value.get("days"):
+        return int(s.value["days"])
+    return settings.RETENTION_DEFAULT_DAYS
+
+
 def read_settings(db: Session) -> dict:
-    retention = _get(db, RETENTION_KEY)
     return {
-        "retention_days": retention.value.get("days", 30) if retention else 30,
+        "retention_days": retention_days(db),
         "idle_threshold_minutes": idle_threshold_minutes(db),
     }
 

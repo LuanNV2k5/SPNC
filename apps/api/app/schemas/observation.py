@@ -41,6 +41,7 @@ class ObservedSessionItem(BaseModel):
     signal_count: int
     final_loc: Optional[int] = None
     working_time_seconds: Optional[int] = None
+    trace_purged_at: Optional[datetime] = None   # docs/45 §3.6: raw trace removed by the retention purge
 
 
 class ObservedSessionListResponse(PaginatedResponse):
