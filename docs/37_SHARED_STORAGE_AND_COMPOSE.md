@@ -1,7 +1,7 @@
 # 37 — SHARED SNAPSHOT STORAGE & COMPOSE STACK (PHASE 11) SPECIFICATION
 
 > **Module:** Object storage adapter, first-admin bootstrap, Docker Compose stack (Phase 11)
-> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTED AND VERIFIED 2026-10-29 (§7); lock tag pending Project Owner review
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-11-infra-locked`)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase10` @ `460dcdc` (Phase 10 implemented, lock pending)
 > **Proposed Branch:** `phase11`
@@ -104,7 +104,7 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before implementation.
 
 ## 7. Verification Record
 
-### 7.1 Changes (2026-10-29)
+### 7.1 Changes (2026-10-29, `dfa16c6`)
 | Area | Files |
 |---|---|
 | Storage | `app/services/storage.py` (memory / s3 backends, `StorageUnavailable`, `StorageConflict`, lazy bucket creation, bounded timeouts/retries), `app/core/config.py` (`STORAGE_BACKEND`, `S3_*`), `app/main.py` (503 `STORAGE_UNAVAILABLE`, 409 `SNAPSHOT_CONTENT_CONFLICT` handlers) |
