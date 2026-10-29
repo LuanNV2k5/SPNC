@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from app.core.config import settings
+from app.core.metrics import SNAPSHOT_UPLOAD_FAILURES
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,13 @@ class StorageAdapter:
     # -- Public API (unchanged since Phase 06) -----------------------------------
     def upload_code_snapshot(self, session_id: str, sequence: int, content: str) -> Tuple[str, str]:
         """Stores content and returns (source_hash, object_key)."""
+        try:
+            return self._upload(session_id, content)
+        except StorageUnavailable:
+            SNAPSHOT_UPLOAD_FAILURES.inc()
+            raise
+
+    def _upload(self, session_id: str, content: str) -> Tuple[str, str]:
         source_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         # Content-addressed (ADR-007, docs/39 D1): identical code in a session maps to one blob.
         # `sequence` is kept for API compatibility and no longer part of the key.
@@ -134,6 +142,18 @@ class StorageAdapter:
             if self._is_missing(e):
                 return False
             raise StorageUnavailable(f"Cannot stat {object_key}: {e}") from e
+
+    def ping(self) -> None:
+        """Readiness probe (docs/43 §3.3): raises when the bucket cannot be reached."""
+        if self.backend != "s3":
+            return
+        try:
+            if not self._s3().bucket_exists(self.bucket_name):
+                raise StorageUnavailable("Bucket missing")
+        except StorageUnavailable:
+            raise
+        except Exception as e:
+            raise StorageUnavailable(f"Bucket unavailable: {e}") from e
 
     # -- Orphan cleanup support (docs/39 13A) -------------------------------------
     def list_code_snapshots(self, older_than: datetime, limit: int) -> List[str]:

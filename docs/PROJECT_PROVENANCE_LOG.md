@@ -675,3 +675,19 @@ Correction:
 The Phase 15A baseline is 536 passed (the "536 + 8" in the Phase 15A lock entry counted the re-run file twice); see docs/42 §7.3.
 
 First phase locked under branch protection: the lock commit reached `main` through a pull request with `ci` green.
+
+---
+
+## Decision: Phase 17 Observability Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve both" (reply to "Approve all recommendations in both specs?", covering `docs/43_OBSERVABILITY.md` and the Phase 18 spec). All recommendations D1–D7 in `docs/43_OBSERVABILITY.md` §6 are approved without overrides.
+
+Approved Decisions (summary):
+D1 `prometheus_client`, Prometheus text exposition; D2 every docs/07 §4 metric that maps to an existing code path plus HTTP and daemon-cycle metrics, the rest deferred as follow-ups; D3 each process (API and four daemons) serves its own registry; D4 `/health` liveness without checks and `/ready` readiness (PostgreSQL, Redis, storage), root path, no auth, 503 `NOT_READY` per rule #29; D5 metrics on an internal port `METRICS_PORT` (9100), never on the public API port, no auth; D6 JSON log lines via stdlib `logging` with `request_id` from a contextvar, request-id validation, generic 500 handler; D7 never-log list, redaction filter, automated marker test.

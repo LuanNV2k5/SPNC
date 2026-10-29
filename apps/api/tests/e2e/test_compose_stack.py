@@ -143,3 +143,12 @@ def test_teacher_websocket_served_by_uvicorn(people):
     with connect(ws_url, open_timeout=10) as ws:
         ws.send(json.dumps({"type": "auth", "access_token": people["TEACHER"]}))
         assert json.loads(ws.recv(timeout=10)) == {"type": "authenticated"}
+
+
+def test_health_and_readiness_of_the_stack():
+    # Phase 17 (docs/43 AC-17-07): probes at the root; the stack's PostgreSQL, Redis and MinIO are up
+    assert requests.get(f"{BASE}/health", timeout=10).json() == {"status": "ok"}
+    r = requests.get(f"{BASE}/ready", timeout=10)
+    assert r.status_code == 200, r.text
+    assert r.json()["checks"] == {"database": "ok", "redis": "ok", "storage": "ok"}
+    assert requests.get(f"{BASE}/metrics", timeout=10).status_code == 404   # metrics only on the internal port

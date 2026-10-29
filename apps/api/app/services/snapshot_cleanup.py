@@ -11,6 +11,7 @@ from typing import Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.config import settings
 from app.models.trace import CodeSnapshot
 from app.services.storage import StorageUnavailable, storage_adapter
@@ -26,6 +27,7 @@ def sweep_orphans(db: Session, now: Optional[datetime] = None, storage=storage_a
         candidates = storage.list_code_snapshots(older_than=cutoff, limit=settings.SNAPSHOT_ORPHAN_BATCH_SIZE)
     except StorageUnavailable as e:
         logger.warning(f"Orphan sweep skipped: {e}")
+        metrics.ORPHAN_CLEANUP_FAILURES.inc()
         result["errors"] += 1
         return result
     result["scanned"] = len(candidates)
@@ -35,11 +37,14 @@ def sweep_orphans(db: Session, now: Optional[datetime] = None, storage=storage_a
     for key in candidates:
         if key in referenced:
             continue
+        metrics.ORPHANS_DETECTED.inc()
         try:
             storage.delete_code_snapshot(key)
             result["deleted"] += 1
+            metrics.ORPHANS_CLEANED.inc()
         except StorageUnavailable as e:
             logger.warning(f"Orphan delete failed for {key}: {e}")
+            metrics.ORPHAN_CLEANUP_FAILURES.inc()
             result["errors"] += 1
     if result["deleted"] or result["errors"]:
         logger.info(f"Orphan sweep: {result}")
