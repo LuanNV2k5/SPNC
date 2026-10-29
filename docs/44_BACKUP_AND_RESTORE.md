@@ -79,7 +79,7 @@ Runs on its own compose project (default `spnc-drill`, own ports and volumes; ne
 2. `backup`;
 3. `down -v` (destroy all data);
 4. start empty `postgres` + `minio`, `restore` the set (verification §3.3);
-5. start the full stack; run `verify-live`, check that a snapshot created before the backup is readable through the API, run the compose E2E again;
+5. start the full stack; run `verify-live`; the drill's teacher reads a snapshot created before the backup through the API (`tests/e2e/test_backup_drill.py`), the pre-backup submission keeps its verdict, the worker judges a pre-backup snapshot; run the compose E2E again;
 6. print the elapsed restore time (step 4 start → step 5 E2E green) and tear down.
 
 ### 3.6 Tests
@@ -138,4 +138,33 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md`.
 
 ## 8. Verification Record
 
-_Empty until implementation._
+### 8.1 Changes (2026-10-29)
+| Commit | Content |
+|---|---|
+| `1c70172` | Spec approval (PROJECT_PROVENANCE_LOG) |
+| `c49b4d6` | `deploy/backup/` (`spnc_backup.py`, `Dockerfile`, `drill.sh`), `backup` service and `MINIO_CONSOLE_PORT` in `docker-compose.yml`, `.env.example`, `tests/infra/test_backup.py` (group `phase10plus`), `tests/e2e/test_backup_drill.py`, CI job `backup-drill`, RUNBOOK §9 |
+| `d1cc8b8` | Test fix found by CI (§8.2) and a test that an existing set is never overwritten |
+| `70e3e6b` | Regression runner and seven test files honour `PG_BASE` (§8.2) |
+
+Implementation notes:
+- The restore uses `pg_restore --no-owner --no-privileges`: roles are cluster objects and not in the dump. RUNBOOK §9.4 step 5 re-creates the production judge role.
+- Restore verification compares blobs with `code_snapshots.source_hash` rather than the key name, so Phase 06 keys (`<seq>_<hash>.txt`, docs/39) are checked too.
+- Sets are named to the second; a second backup in the same second is refused, never overwritten.
+- `backups/last-backup.json` records the last scheduled run (`ok`/`failed` + reason) for monitoring.
+- In tests, `pg_dump`/`pg_restore` run in `postgres:16-alpine` through Docker (`host.docker.internal`), the same on Windows and on the CI runner.
+
+### 8.2 Defects Found
+- **Same-second backups (test only).** On the faster CI runner, `test_scheduled_backup_writes_status` ran two backups in the same second into one directory; the second was correctly refused ("already exists"), so the test expected the wrong error. The test now uses separate directories, and a new test pins the refusal.
+- **Local regression did not honour `PG_BASE` (since Phase 16).** Seven test files hard-coded `localhost:5432` (`test_auth`, `test_admin`, `test_academic`, `test_trace`, `test_run`, `test_fencing`, `test_queue`), and eight more read `PHASE08E/09/10_DATABASE_URL`, whose default is also `localhost:5432`. CI was unaffected (its database is on 5432), but a local run with another `PG_BASE` silently used the shared 5432 container for those files. During this phase that caused a lock wait between this regression and the parallel Phase 17 regression on the same database, and `test_queue.py::test_Q06` failed because the test wrote to 5432 while `reconcile()` read `PG_BASE`. Fixed: the files read `TEST_DATABASE_URL` (default unchanged), and `regression.sh` also sets the three `PHASE*` variables. Checked with the shared container's per-database transaction counters during the full run (§8.3).
+
+### 8.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| AC-18-01…04 `tests/infra/test_backup.py` | Disposable PostgreSQL 16 (port 55433), MinIO test container, `pg_dump`/`pg_restore` 16 in Docker | **19 passed**: complete set and manifest, orphan excluded; missing and tampered blob fail the backup with no set left; one snapshot for keys and dump (a row committed during the backup is in neither); corrupted dump / blob / missing blob detected; restore round trip; non-empty database or bucket refused; corrupted set refused before anything is written; `verify-live`; pruning and `.partial` cleanup; status file; schedule time; unsafe keys |
+| AC-18-05 restore drill | This machine, project `spnc-drill` (API 8018, console 9018), Docker Desktop | **PASSED**: set `spnc-20261029T131739Z` (59 rows, 25 tables, 5 blobs, revision `b2d8f5a9c314`); all volumes destroyed; restore + verification + full stack + `verify-live` + teacher reads the pre-backup snapshot via `GET …/snapshots/{id}` + pre-backup submission still `ACCEPTED 100` + a pre-backup snapshot judged by the worker + compose E2E 4 passed. **Restore time 22 s** (RTO 4 h = 14 400 s). Two earlier drill runs failed in the drill's own steps (a practice session ends on submission; Git Bash path conversion), both fixed before this run |
+| AC-18-06 schedule | Project `spnc-p18-sched`, `BACKUP_TIME_UTC` = 3 min ahead, `BACKUP_KEEP=2`, two old sets present | set `spnc-20261029T131600Z` created at 13:16:00 UTC, oldest set pruned, `last-backup.json` `ok`, next run scheduled +24 h |
+| AC-18-07 full regression | This machine, `regression.sh all`, `PG_BASE` on port 55433 | **557 passed, 0 failed** (45 files; Phase 16 baseline 538 + 19 new). The shared 5432 container's per-database transaction counters rose only by its idle background rate (2–4 per 100 s per database, measured afterwards; about 30 over the run), so no test used it |
+| AC-18-07 CI | GitHub Actions run 40881419054 (`d1cc8b8`) | all 6 groups green, `ci` green |
+| AC-18-08 drill on GitHub | run 40880784168 (`workflow_dispatch`, `c49b4d6`) | `backup drill` **success**, `compose E2E` success (the `phase10plus` failure in that run is the §8.2 test fix) |
+| AC-18-09 defaults | `docker compose config` with the Phase 16 `.env.example` (no new variables) | API 8000, console 9001 unchanged; backup defaults `./backups`, `19:00`, 14 |
+| Demo stack untouched | `docker ps` | project `phase11` containers and volumes unchanged throughout |
