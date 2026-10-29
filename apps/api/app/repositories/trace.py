@@ -1,7 +1,9 @@
 import uuid
+from datetime import datetime, timezone
 from typing import List, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
 from app.models.trace import TraceEvent, CodeSnapshot, ScratchpadRevision
@@ -25,46 +27,42 @@ class TraceConflictError(Exception):
 
 def bulk_insert_events(db: Session, session_id: uuid.UUID, events_data: List[dict]) -> int:
     """
-    Inserts a batch of trace events atomically.
+    Inserts a batch of trace events atomically and idempotently (REQ-TRACE-009).
     events_data should contain TraceEvent fields including 'canonical_fingerprint'.
     Returns number of new events accepted.
-    Raises TraceConflictError if there is a conflict.
+    Raises TraceConflictError if a sequence number already holds different content.
+
+    Concurrency-safe (docs/42 §7): INSERT ... ON CONFLICT DO NOTHING, then fingerprints are
+    compared for the sequence numbers that already existed. Two identical batches racing
+    (client retries) both succeed; only one inserts.
     """
     if not events_data:
         return 0
-        
-    seq_numbers = [e["sequence_number"] for e in events_data]
-    
-    # 1. Check for existing rows (idempotency vs conflict)
-    existing_dict = _get_existing_events_dict(db, session_id, seq_numbers)
-    
-    to_insert = []
-    
+
+    rows, seen = [], {}
+    now = datetime.now(timezone.utc)
     for incoming in events_data:
         seq = incoming["sequence_number"]
-        fingerprint = incoming["canonical_fingerprint"]
-        
-        if seq in existing_dict:
-            existing_row = existing_dict[seq]
-            if existing_row.canonical_fingerprint != fingerprint:
+        if seq in seen:
+            # Intra-batch duplicate: identical is ignored, different is a conflict
+            if seen[seq] != incoming["canonical_fingerprint"]:
                 raise TraceConflictError(f"Sequence {seq} conflict. Different content.")
-            # Exact duplicate, safely ignore
-        else:
-            # Need to insert
-            event_obj = TraceEvent(**incoming)
-            to_insert.append(event_obj)
-            # Add to existing_dict to prevent intra-batch duplicates (should be caught by input validation, but just in case)
-            existing_dict[seq] = event_obj
-            
-    if to_insert:
-        try:
-            db.add_all(to_insert)
-            db.flush()
-        except IntegrityError:
-            db.rollback()
-            raise TraceConflictError("Database integrity error during trace batch ingest.")
-            
-    return len(to_insert)
+            continue
+        seen[seq] = incoming["canonical_fingerprint"]
+        rows.append({"id": uuid.uuid4(), "server_timestamp": now, **incoming})
+
+    inserted = set(db.scalars(
+        pg_insert(TraceEvent).values(rows)
+        .on_conflict_do_nothing(index_elements=["session_id", "sequence_number"])
+        .returning(TraceEvent.sequence_number)
+    ).all())
+
+    already_there = [seq for seq in seen if seq not in inserted]
+    if already_there:
+        for seq, existing_row in _get_existing_events_dict(db, session_id, already_there).items():
+            if existing_row.canonical_fingerprint != seen[seq]:
+                raise TraceConflictError(f"Sequence {seq} conflict. Different content.")
+    return len(inserted)
 
 def get_trace_state(db: Session, session_id: uuid.UUID) -> Tuple[int, int]:
     """

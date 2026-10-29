@@ -202,6 +202,38 @@ def test_t05_threaded_concurrency(db_session):
     assert all(c == 200 for c in status_codes)
     assert sum(accepted) == 1
 
+
+def test_t05b_concurrent_retries_never_conflict(db_session):
+    """docs/42 §7: identical batches racing (client retries) are all accepted, one inserts.
+    Before the ON CONFLICT fix the loser of the race got 409 intermittently (seen in CI)."""
+    _, _, _, s_tok, _, _, session_id = _setup_session(db_session)
+    import concurrent.futures
+
+    for round_no in range(1, 6):
+        req = {"events": [_create_trace_event(round_no * 10 + k) for k in range(3)]}
+
+        def fire():
+            return client.post(f"/api/v1/my/coding-sessions/{session_id}/trace-events/batch", headers=_auth(s_tok), json=req)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            responses = list(executor.map(lambda _: fire(), range(20)))
+        assert [r.status_code for r in responses] == [200] * 20, [r.text for r in responses if r.status_code != 200][:2]
+        assert sum(r.json()["accepted_count"] for r in responses) == 3
+
+
+def test_t05c_conflicting_content_still_rejected(db_session):
+    _, _, _, s_tok, _, _, session_id = _setup_session(db_session)
+    url = f"/api/v1/my/coding-sessions/{session_id}/trace-events/batch"
+    ev = _create_trace_event(1)
+    assert client.post(url, headers=_auth(s_tok), json={"events": [ev]}).status_code == 200
+    changed = {**ev, "payload": {"different": True}}
+    assert client.post(url, headers=_auth(s_tok), json={"events": [changed]}).status_code == 409
+    # Mixed batch: one new + one conflicting -> nothing from it is stored
+    r = client.post(url, headers=_auth(s_tok), json={"events": [_create_trace_event(2), changed]})
+    assert r.status_code == 409
+    state = client.get(f"/api/v1/my/coding-sessions/{session_id}/trace-state", headers=_auth(s_tok)).json()
+    assert state["highest_contiguous_sequence"] == 1
+
 def test_r01_teacher_replay(db_session):
     _, s, t_tok, s_tok, cls_id, _, session_id = _setup_session(db_session)
     req = {"events": [_create_trace_event(1), _create_trace_event(2)]}
