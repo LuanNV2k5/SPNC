@@ -309,9 +309,10 @@ def test_scheduled_backup_writes_status(source, tmp_path):
     status = json.loads((tmp_path / "last-backup.json").read_text())
     assert status["status"] == "ok" and status["set"] in bk.list_sets(str(tmp_path))
 
-    broken = _cfg(SRC_DB, f"spnc-p18-none-{uuid.uuid4().hex[:8]}", tmp_path)   # bucket has none of the blobs
+    # Own directory: set names have one-second resolution, a second run in the same second is refused
+    broken = _cfg(SRC_DB, f"spnc-p18-none-{uuid.uuid4().hex[:8]}", tmp_path / "b")   # bucket has none of the blobs
     assert bk.run_scheduled_backup(broken) is False
-    status = json.loads((tmp_path / "last-backup.json").read_text())
+    status = json.loads((tmp_path / "b" / "last-backup.json").read_text())
     assert status["status"] == "failed" and "missing" in status["error"]
 
 
@@ -326,3 +327,13 @@ def test_next_run():
 def test_unsafe_keys_are_refused(tmp_path, key):
     with pytest.raises(bk.BackupError, match="Unsafe"):
         bk._safe_blob_path(str(tmp_path), key)
+
+
+def test_existing_set_is_never_overwritten(source, tmp_path):
+    cfg = _cfg(SRC_DB, source["bucket"], tmp_path)
+    at = datetime(2026, 10, 6, 19, 0, tzinfo=timezone.utc)
+    path = bk.create_backup(cfg, now=at)
+    before = bk.load_manifest(path)
+    with pytest.raises(bk.BackupError, match="already exists"):
+        bk.create_backup(cfg, now=at)
+    assert bk.load_manifest(path) == before and bk.verify_set(path) == []
