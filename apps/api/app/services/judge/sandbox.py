@@ -22,17 +22,25 @@ SANDBOX_GID = 1000
 
 def prepare_workspace(path: str) -> None:
     """
-    Hands a per-run workspace to the sandbox user. Needed when the worker runs as root
-    (containerised worker, docs/37 D3): mkdtemp creates 0700 root-owned dirs the sandbox
-    user could neither read nor write. No-op for a non-root worker.
+    Hands a per-run workspace to the sandbox user: mkdtemp creates 0700 dirs owned by the
+    worker, which the sandbox user (uid 1000) could neither read nor write. A root worker
+    chowns them (docs/37 D3); a non-root Linux worker opens their modes (docs/42).
     """
     geteuid = getattr(os, "geteuid", None)
-    if geteuid is None or geteuid() != 0:
+    if geteuid is None:
+        return   # Windows host: Docker Desktop shares files with permissive modes
+    if geteuid() == 0:
+        for root, dirs, files in os.walk(path):
+            os.chown(root, SANDBOX_UID, SANDBOX_GID)
+            for name in files:
+                os.chown(os.path.join(root, name), SANDBOX_UID, SANDBOX_GID)
         return
+    # Non-root worker on Linux (docs/42): it cannot chown, so open this per-run directory to the
+    # sandbox user instead. The directory is random, short-lived and removed after the run.
     for root, dirs, files in os.walk(path):
-        os.chown(root, SANDBOX_UID, SANDBOX_GID)
+        os.chmod(root, 0o777)
         for name in files:
-            os.chown(os.path.join(root, name), SANDBOX_UID, SANDBOX_GID)
+            os.chmod(os.path.join(root, name), 0o666)
 
 class Sandbox:
     def __init__(self):

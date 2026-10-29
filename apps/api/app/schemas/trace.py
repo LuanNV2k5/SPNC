@@ -33,8 +33,7 @@ class TraceEventResponse(BaseModel):
     server_timestamp: datetime
     payload: Dict[str, Any]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TraceReplayResponse(BaseModel):
     items: List[TraceEventResponse]

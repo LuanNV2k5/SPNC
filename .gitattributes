@@ -1,0 +1,4 @@
+# Shell scripts and CI config must keep LF line endings (bash fails on CRLF)
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
