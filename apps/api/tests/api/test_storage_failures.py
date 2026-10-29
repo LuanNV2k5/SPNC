@@ -119,6 +119,14 @@ def test_bootstrap_refuses_weak_or_missing_password(db, monkeypatch):
     assert db.scalars(select(User)).all() == []
 
 
+def test_bootstrap_refuses_reserved_email(db, monkeypatch):
+    """An address API responses reject (EmailStr) would make /auth/me fail with 500."""
+    monkeypatch.setattr(cli, "SessionLocal", TestingSessionLocal)
+    monkeypatch.setenv(cli.PASSWORD_ENV, "a-strong-bootstrap-pw")
+    assert cli.main(["create-admin", "--username", "root", "--email", "admin@spnc.local"]) == 1
+    assert db.scalars(select(User)).all() == []
+
+
 def test_bootstrap_refuses_taken_username(db, world):
     with TestingSessionLocal() as s, pytest.raises(bootstrap.BootstrapRefused):
         bootstrap.create_first_admin(s, "teacher", "new@spnc.io", "a-strong-bootstrap-pw")

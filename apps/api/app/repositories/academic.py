@@ -168,10 +168,11 @@ def get_practice_problems_for_student(
 ) -> Tuple[List[Problem], int]:
     """REQ-STU-001: PUBLIC problems plus CLASS problems published to the student's active classes."""
     class_ids = get_class_ids_for_student(db, student_id)
+    if not class_ids:
+        return [], 0   # REQ-PROB-003 / OQ-10: PUBLIC also needs an active class membership
     published = db.query(ProblemClassPublication.problem_id).filter(ProblemClassPublication.class_id.in_(class_ids))
-    visible = Problem.visibility == ProblemVisibility.PUBLIC.value
-    if class_ids:
-        visible = visible | ((Problem.visibility == ProblemVisibility.CLASS.value) & Problem.id.in_(published))
+    visible = (Problem.visibility == ProblemVisibility.PUBLIC.value) | (
+        (Problem.visibility == ProblemVisibility.CLASS.value) & Problem.id.in_(published))
     q = db.query(Problem).filter(Problem.deleted_at.is_(None), visible)
     if difficulty:
         q = q.filter(Problem.difficulty == difficulty)
@@ -457,6 +458,19 @@ def create_exam_session(
     db.add(s)
     db.flush()
     return s
+
+
+def lock_participation(db: Session, participation_id: uuid.UUID) -> Optional[ExamParticipation]:
+    return (db.query(ExamParticipation).filter(ExamParticipation.id == participation_id)
+            .with_for_update().populate_existing().first())
+
+
+def get_active_exam_session(db: Session, participation_id: uuid.UUID, problem_id: uuid.UUID) -> Optional[CodingSession]:
+    return db.query(CodingSession).filter(
+        CodingSession.exam_participation_id == participation_id,
+        CodingSession.problem_id == problem_id,
+        CodingSession.status == SessionStatus.ACTIVE.value,
+    ).order_by(CodingSession.opened_at).first()
 
 
 def get_session_by_id(db: Session, session_id: uuid.UUID) -> Optional[CodingSession]:

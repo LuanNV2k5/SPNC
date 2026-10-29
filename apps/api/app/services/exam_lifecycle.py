@@ -169,7 +169,7 @@ def admin_cancel_exam(db: Session, admin: User, exam_id: uuid.UUID) -> Exam:
         raise HTTPException(status_code=404, detail=_error("EXAM_NOT_FOUND", "Exam not found"))
     if _value(exam.status) == ExamStatus.CANCELLED.value:
         return exam
-    _assert_cancellable(exam, "EXAM_ONGOING_CANCEL_UNDECIDED")
+    _assert_cancellable(exam, "EXAM_ONGOING_CANCEL_FORBIDDEN")   # OQ-23 resolved (docs/41 R7)
     _apply_cancel(db, exam, admin.id, None)
     db.add(AuditLog(actor_id=admin.id, action="EXAM_ADMIN_CANCELLED", target_type="EXAM", target_id=str(exam.id)))
     db.flush()

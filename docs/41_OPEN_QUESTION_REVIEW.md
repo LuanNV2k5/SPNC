@@ -1,7 +1,7 @@
 # 41 — REVIEW OF THE REMAINING OPEN QUESTIONS (STEP 0)
 
 > **Scope:** OQ-01 to OQ-13, OQ-15, OQ-23, OQ-24 (16 questions still OPEN after Phase 14)
-> **Status:** APPROVED 2026-10-29 (R1–R10 as recommended; see PROJECT_PROVENANCE_LOG.md) — Phase 15A IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-29 (R1–R10 as recommended; see PROJECT_PROVENANCE_LOG.md) — Phase 15A IMPLEMENTED AND VERIFIED 2026-10-29 (§5); lock tag pending Project Owner review
 > **Date:** 2026-10-29
 > **Baseline:** `main` = `phase-14-open-questions-locked` (`2f7a71f`)
 > **Proposed Branch:** `phase15`
@@ -112,3 +112,35 @@ For each question, the written "current assumption" was compared with **what the
 | R10 | OQ-24 | Read-only reuse in V1 | Docs |
 
 If accepted, R1–R5 become a short Phase 15A (behaviour fixes, with tests and regression) to run before or alongside the CI work (Step 1). R6–R10 are recorded in `OPEN_QUESTIONS.md` and `PROJECT_PROVENANCE_LOG.md`; R3 and R7 record that the code now follows the requirement.
+
+---
+
+## 5. Phase 15A Verification Record
+
+### 5.1 Changes (2026-10-29)
+| Item | Files |
+|---|---|
+| Decisions | `65e2b9c`: OPEN_QUESTIONS (all remaining OQs resolved), PROJECT_PROVENANCE_LOG |
+| R1 OQ-02 | `services/login_throttle.py` (memory / Redis backends, fails open); `endpoints/auth.py` (checked before the password; failure counted; reset on success; 429 `LOGIN_RATE_LIMITED` + `Retry-After`); config `LOGIN_THROTTLE_BACKEND` (default `memory`), `LOGIN_MAX_FAILURES` 5, `LOGIN_WINDOW_SECONDS` 900; compose sets `redis` |
+| R2 OQ-05 | `services/admin.update_user`: 403 `SELF_MODIFICATION_FORBIDDEN` when an admin would change their own role or status (the last-admin rule is checked first; a no-op passes) |
+| R3 OQ-10 | `services/academic.py` (`_student_enrolled`): problem read, practice start and public bank require an active membership for PUBLIC problems; `repositories/academic.get_practice_problems_for_student` returns nothing without a membership |
+| R4 OQ-01 exam | `start_exam_session` locks the participation and resumes the ACTIVE session for the same problem (200), 409 `EXAM_SESSION_ALREADY_ACTIVE` for a different language, 201 for a new one |
+| R5 OQ-01/13 | `session_lifecycle.abandon_stale_practice_sessions` (last trace event or opening older than `SESSION_STALE_HOURS` = 24 → ABANDONED by `SYSTEM_SESSION_POLICY`, batch 200, one transaction each), run by the exam scheduler loop |
+| R7 OQ-23 | `EXAM_ONGOING_CANCEL_UNDECIDED` → `EXAM_ONGOING_CANCEL_FORBIDDEN` |
+
+### 5.2 Defects Found Along the Way
+- **The HTTP error handler dropped response headers** (`main.py`), so `Retry-After` and any `WWW-Authenticate` never reached clients. Fixed: `exc.headers` are passed through.
+- **The bootstrap CLI accepted email addresses that API responses reject.** A first admin created as `admin@spnc.local` made `/auth/me` and `/admin/users` return 500 (`EmailStr` refuses reserved domains). Fixed: the CLI validates with the same rule and refuses such addresses (new test). The demo database's admin email was corrected to `admin@spnc.io`.
+
+### 5.3 Earlier Tests Adjusted
+- R3: shared fixtures enrol their students in a "home" class: `test_submissions.world`, `test_testcases.world`, `test_session_lifecycle.practice`, `test_academic._setup_student_with_public_problem` and an `_enroll` helper used by 6 Phase 05 tests. Statistics enrols its outsider elsewhere. Phase 12A checks the joined class instead of the class count. The compose E2E student joins a class by invite code.
+- R4: `test_exam_lifecycle.test_submit_after_finalize_is_forbidden` uses the resumed session; `test_exam_timeout` takes its session-without-code from the second participant.
+- R2: the Phase 04 last-admin race is now two admins demoting each other.
+- R7: the admin-cancel test expects the new error code.
+
+### 5.4 Verification
+| Check | Environment | Result |
+|---|---|---|
+| `test_phase15a_oq_fixes.py` | Disposable PostgreSQL 16.15 + local Redis | **8 passed** (throttle block, reset, case-insensitive key, Redis shared + fail-open; self-modification; PUBLIC needs membership, teachers unaffected; exam resume / language conflict / new after submit; stale practice abandoned, active and exam sessions kept, idempotent) |
+| Full regression Phase 03–15A | Fresh per-phase DBs migrated to head; Redis; Docker sandbox; MinIO | **536 passed, 0 failed** (44 files), plus `test_storage_failures.py` re-run after the bootstrap fix: **8 passed** (one new test) |
+| Demo compose stack rebuilt from `phase15` | Docker Desktop (Windows host) | E2E **4 passed** (student joins by invite code); live: 5 wrong logins → 429 `LOGIN_RATE_LIMITED`, `Retry-After: 900`, counter key in Redis; `/auth/me` and `/admin/users` 200 after the email fix; sole admin self-demotion → `LAST_ADMIN_PROTECTED` |

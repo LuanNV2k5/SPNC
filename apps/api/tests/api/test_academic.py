@@ -169,6 +169,12 @@ def _publish(db, exam_id) -> None:
     db.commit()
 
 
+def _enroll(tok_teacher: str, student_id, name: str = "Home") -> None:
+    """docs/41 R3 (REQ-PROB-003): students reach PUBLIC problems through a class membership."""
+    cid = client.post("/api/v1/classes", json={"name": name, "academic_year": "2026"}, headers=_auth(tok_teacher)).json()["id"]
+    client.post(f"/api/v1/classes/{cid}/members", json={"student_id": str(student_id)}, headers=_auth(tok_teacher))
+
+
 def _active_exam_times(started_minutes_ago: int = 10, duration_minutes: int = 120) -> tuple:
     start = datetime.now(timezone.utc) - timedelta(minutes=started_minutes_ago)
     end = start + timedelta(minutes=duration_minutes)
@@ -432,6 +438,7 @@ class TestProblemManagement:
         s = _make_user(db_session, "student_p05", "STUDENT")
         tok_t = _login("teacher_p05")
         tok_s = _login("student_p05")
+        _enroll(tok_t, s.id)   # docs/41 R3
         self._create_problem(tok_t, "PrivateProb", "PRIVATE")
         self._create_problem(tok_t, "PublicProb", "PUBLIC")
         r = client.get("/api/v1/problems/public/bank", headers=_auth(tok_s))
@@ -457,6 +464,7 @@ class TestProblemManagement:
         s = _make_user(db_session, "student_p07", "STUDENT")
         tok_t = _login("teacher_p07")
         tok_s = _login("student_p07")
+        _enroll(tok_t, s.id)   # docs/41 R3
         r = self._create_problem(tok_t, "PublicAccess", "PUBLIC")
         pid = r.json()["id"]
         r2 = client.get(f"/api/v1/problems/{pid}", headers=_auth(tok_s))
@@ -1103,6 +1111,9 @@ class TestSessionManagement:
             "supported_languages": ["CPP17", "PYTHON3"],
         }, headers=_auth(tok_t))
         pid = r_p.json()["id"]
+        # docs/41 R3 (REQ-PROB-003): students reach PUBLIC problems through a class membership
+        cid = client.post("/api/v1/classes", json={"name": f"Home{username_suffix}", "academic_year": "2026"}, headers=_auth(tok_t)).json()["id"]
+        client.post(f"/api/v1/classes/{cid}/members", json={"student_id": str(s.id)}, headers=_auth(tok_t))
         return t, s, tok_t, tok_s, pid
 
     def test_P05_S01_start_practice_session(self, db_session):
@@ -1154,6 +1165,7 @@ class TestSessionManagement:
         s = _make_user(db_session, "student_s03", "STUDENT")
         tok_t = _login("teacher_s03")
         tok_s = _login("student_s03")
+        _enroll(tok_t, s.id)   # docs/41 R3
         # Create a cancelled exam with a stale IN_PROGRESS participation
         start, end = _active_exam_times()
         e = Exam(owner_id=t.id, title="CancelledE", start_time=start, end_time=end, status="CANCELLED")
@@ -1245,6 +1257,7 @@ class TestSessionManagement:
         s = _make_user(db_session, "student_s09", "STUDENT")
         tok_t = _login("teacher_s09")
         tok_s = _login("student_s09")
+        _enroll(tok_t, s.id)   # docs/41 R3
         r_p = client.post("/api/v1/problems", json={
             "title": "CPP17Only", "description": "d",
             "visibility": "PUBLIC", "supported_languages": ["CPP17"]
@@ -1362,6 +1375,7 @@ class TestSessionManagement:
         tok_t = _login("teacher_s13")
         tok_s1 = _login("student_s13a")
         tok_s2 = _login("student_s13b")
+        _enroll(tok_t, s1.id)   # docs/41 R3
         r_p = client.post("/api/v1/problems", json={
             "title": "S13Prob", "description": "d",
             "visibility": "PUBLIC", "supported_languages": ["CPP17"]
@@ -1525,6 +1539,7 @@ class TestAuthorizationMatrix:
         s = _make_user(db_session, "student_a10", "STUDENT")
         tok_t = _login("teacher_a10")
         tok_s = _login("student_a10")
+        _enroll(tok_t, s.id)   # docs/41 R3
         r_p = client.post("/api/v1/problems", json={
             "title": "A10Prob", "description": "d",
             "visibility": "PUBLIC", "supported_languages": ["CPP17"]

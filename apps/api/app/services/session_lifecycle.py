@@ -1,9 +1,12 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
 from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
+from app.core.config import settings
 
 from app.models.session import CodingSession, SessionStatus, TerminationSource
 from app.models.trace import TraceEvent, TraceEventType
@@ -89,5 +92,34 @@ def finalize_session(
 
 
 def abandon_session(db: Session, session_id: uuid.UUID) -> CodingSession:
-    """Entry point for a future stale-session policy (out of 08E scope, docs/34 §3.2)."""
+    """Stale-session policy entry point (docs/34 §3.2; enabled by docs/41 R5)."""
     return finalize_session(db, session_id, SessionStatus.ABANDONED, TerminationSource.SYSTEM_SESSION_POLICY)
+
+
+def abandon_stale_practice_sessions(db: Session, now: Optional[datetime] = None) -> List[uuid.UUID]:
+    """
+    OQ-01 / OQ-13 (docs/41 R5): an ACTIVE practice session whose latest trace event (or opening,
+    if it has none) is older than SESSION_STALE_HOURS is ended as ABANDONED by SYSTEM_SESSION_POLICY.
+    Exam sessions are left to the exam timeout path. One transaction per session.
+    """
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=settings.SESSION_STALE_HOURS)
+    last_activity = func.coalesce(
+        select(func.max(TraceEvent.server_timestamp)).where(TraceEvent.session_id == CodingSession.id)
+        .correlate(CodingSession).scalar_subquery(),
+        CodingSession.opened_at,
+    )
+    stale_ids = db.scalars(select(CodingSession.id).where(
+        CodingSession.status == SessionStatus.ACTIVE.value,
+        CodingSession.is_exam_context == False,  # noqa: E712
+        last_activity < cutoff,
+    ).order_by(CodingSession.opened_at).limit(settings.SESSION_STALE_BATCH_SIZE)).all()
+    abandoned = []
+    for session_id in stale_ids:
+        try:
+            abandon_session(db, session_id)
+            db.commit()
+            abandoned.append(session_id)
+        except HTTPException:
+            db.rollback()   # ended concurrently (student end/submit): nothing to do
+    return abandoned

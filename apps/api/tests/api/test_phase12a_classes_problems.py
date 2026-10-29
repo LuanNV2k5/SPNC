@@ -57,7 +57,8 @@ def test_invite_code_generated_unique_and_owner_only(world):
 
     assert _join(w["h_s"], a["invite_code"]).status_code == 201
     mine = client.get("/api/v1/my/classes", headers=w["h_s"]).json()
-    assert mine["total"] == 1 and "invite_code" not in mine["items"][0]
+    assert a["id"] in [i["id"] for i in mine["items"]]               # plus the fixture's home class
+    assert all("invite_code" not in i for i in mine["items"])
     assert a["invite_code"] not in str(mine)
 
 

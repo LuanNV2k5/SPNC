@@ -91,6 +91,10 @@ def problem(people):
         r = requests.post(f"{API}/problems/{pid}/test-cases", json={"input_data": inp, "expected_output": out, "is_sample": sample},
                           headers=h, timeout=10)
         assert r.status_code == 201, r.text
+    # REQ-PROB-003 (docs/41 R3): the student reaches PUBLIC problems through a class, joined by invite code
+    code = requests.post(f"{API}/classes", json={"name": "E2E", "academic_year": "2026"}, headers=h, timeout=10).json()["invite_code"]
+    r = requests.post(f"{API}/my/classes/join", json={"invite_code": code}, headers=_h(people["STUDENT"]), timeout=10)
+    assert r.status_code == 201, r.text
     return pid
 
 

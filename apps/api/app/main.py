@@ -57,7 +57,8 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
             detail["request_id"] = getattr(request.state, "request_id", "")
 
-    return JSONResponse(status_code=exc.status_code, content=detail)
+    # Keep headers such as Retry-After (429) and WWW-Authenticate (401)
+    return JSONResponse(status_code=exc.status_code, content=detail, headers=getattr(exc, "headers", None))
 
 
 

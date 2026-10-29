@@ -78,6 +78,13 @@ def update_user(db: Session, actor_id: uuid.UUID, user_id: uuid.UUID, role: Opti
                         detail={"error_code": "LAST_ADMIN_PROTECTED", "message": "Cannot demote or lock the last usable admin"}
                     )
 
+        # OQ-05 (docs/41 R2): another admin must change an admin's own role or status
+        if actor_id == user_id and ((role and role != user.role) or (user_status and user_status != user.status)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error_code": "SELF_MODIFICATION_FORBIDDEN", "message": "Ask another admin to change your own role or status"}
+            )
+
         if role:
             if role not in [RoleEnum.ADMIN.value, RoleEnum.TEACHER.value, RoleEnum.STUDENT.value]:
                 raise HTTPException(status_code=400, detail={"error_code": "INVALID_ROLE", "message": "Invalid role"})

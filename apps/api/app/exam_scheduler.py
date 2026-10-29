@@ -6,6 +6,7 @@ import threading
 from app.db.session import SessionLocal
 from app.core.config import settings
 from app.services.exam_lifecycle import run_tick
+from app.services.session_lifecycle import abandon_stale_practice_sessions
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,6 +39,13 @@ def run_scheduler_loop():
                                 f"auto_submissions={len(result['auto_submissions'])}")
         except Exception as e:
             logger.error(f"Exam scheduler tick error: {e}")
+        try:
+            with SessionLocal() as db:
+                abandoned = abandon_stale_practice_sessions(db)   # docs/41 R5
+                if abandoned:
+                    logger.info(f"Stale practice sessions abandoned: {len(abandoned)}")
+        except Exception as e:
+            logger.error(f"Stale session sweep error: {e}")
 
         # Interruptible sleep: wakes up immediately if shutdown_event is set
         shutdown_event.wait(timeout=settings.EXAM_SCHEDULER_INTERVAL_SECONDS)

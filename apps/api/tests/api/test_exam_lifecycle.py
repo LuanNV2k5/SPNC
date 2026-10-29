@@ -207,10 +207,9 @@ def test_finalize_completes_ends_sessions_without_submission(db, world):
 def test_submit_after_finalize_is_forbidden(world):
     w = world
     eid, part_id, sid = _open_exam(w)
-    sid2 = _exam_session(w, part_id)
-    snap = _snapshot(w["h_s"], sid2, "SUM\n")
+    snap = _snapshot(w["h_s"], sid, "SUM\n")      # docs/41 R4: one active session per problem
     client.post(f"/api/v1/my/exams/{eid}/finalize", headers=w["h_s"])
-    r = _submit(w["h_s"], sid2, snap)
+    r = _submit(w["h_s"], sid, snap)
     assert r.status_code == 403   # session already ended by finalize
 
 
@@ -274,7 +273,7 @@ def test_admin_cancel_restricted_to_draft_and_scheduled(db, world):
     eid, part_id, _ = _open_exam(w)
     _set(eid, status="ONGOING")
     r = client.patch(f"/api/v1/admin/exams/{eid}/cancel", headers=h_a)
-    assert r.status_code == 409 and r.json()["error_code"] == "EXAM_ONGOING_CANCEL_UNDECIDED"
+    assert r.status_code == 409 and r.json()["error_code"] == "EXAM_ONGOING_CANCEL_FORBIDDEN"
     db.expire_all()
     assert db.get(ExamParticipation, uuid.UUID(part_id)).status == "IN_PROGRESS"
 

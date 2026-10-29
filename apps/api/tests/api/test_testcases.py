@@ -92,10 +92,13 @@ def _auth(username):
 def world(db):
     _make_user(db, "owner", "TEACHER")
     _make_user(db, "other_t", "TEACHER")
-    _make_user(db, "stu", "STUDENT")
+    stu = _make_user(db, "stu", "STUDENT")
     h_owner, h_other, h_stu = _auth("owner"), _auth("other_t"), _auth("stu")
     pid = client.post("/api/v1/problems", json={"title": "Sum", "description": "d", "visibility": "PUBLIC",
                                                 "supported_languages": ["PYTHON3"]}, headers=h_owner).json()["id"]
+    # docs/41 R3 (REQ-PROB-003): PUBLIC problems are reached through a class membership
+    cid = client.post("/api/v1/classes", json={"name": "Home", "academic_year": "2026"}, headers=h_owner).json()["id"]
+    client.post(f"/api/v1/classes/{cid}/members", json={"student_id": str(stu.id)}, headers=h_owner)
     return {"h_owner": h_owner, "h_other": h_other, "h_stu": h_stu, "pid": pid}
 
 

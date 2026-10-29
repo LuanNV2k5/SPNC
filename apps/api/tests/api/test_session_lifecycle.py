@@ -115,7 +115,12 @@ def practice(db):
         "title": "P08E", "description": "d", "visibility": "PUBLIC", "supported_languages": ["PYTHON3"],
     }, headers=h_t)
     assert r.status_code in (200, 201), r.text
-    r = client.post("/api/v1/my/practice/sessions", json={"problem_id": r.json()["id"], "language": "PYTHON3"}, headers=h_s)
+    pid = r.json()["id"]
+    # docs/41 R3 (REQ-PROB-003): PUBLIC practice needs a class membership
+    cid = client.post("/api/v1/classes", json={"name": "Home", "academic_year": "2026"}, headers=h_t).json()["id"]
+    student = db.query(User).filter(User.username == "student_08e").first()
+    client.post(f"/api/v1/classes/{cid}/members", json={"student_id": str(student.id)}, headers=h_t)
+    r = client.post("/api/v1/my/practice/sessions", json={"problem_id": pid, "language": "PYTHON3"}, headers=h_s)
     assert r.status_code == 201, r.text
     return h_s, r.json()["id"]
 

@@ -48,8 +48,9 @@ def people(db, world):
     w = world
     stu2 = db.scalar(select(User).where(User.username == "stu2"))
     stu3 = _make_user(db, "stu3", "STUDENT")
-    _make_user(db, "outsider", "STUDENT")
+    outsider = _make_user(db, "outsider", "STUDENT")
     cid = _class_with(w, w["student_id"], stu2.id, stu3.id)
+    _class_with(w, outsider.id)   # docs/41 R3: practising PUBLIC problems needs some class; not the one under test
     return {**w, "cid": cid, "stu2": stu2.id, "stu3": stu3.id, "h_out": _auth("outsider")}
 
 

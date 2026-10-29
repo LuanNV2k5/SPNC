@@ -15,7 +15,7 @@ Covers:
 import uuid
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_teacher, require_student, get_current_user
@@ -334,7 +334,7 @@ def list_public_problems(
     current_user: User = Depends(get_current_user),
 ):
     page, size, skip = _paginate(page, size)
-    items, total = svc.list_public_problems(db, skip=skip, limit=size)
+    items, total = svc.list_public_problems(db, user=current_user, skip=skip, limit=size)
     return {"items": items, "total": total, "page": page, "size": size}
 
 
@@ -708,13 +708,16 @@ def end_practice_session(
 )
 def start_exam_session(
     req: StartExamSessionRequest,
+    response: Response,
     participation_id: uuid.UUID = Query(..., description="ExamParticipation ID"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
-    s = svc.start_exam_session(db, student=current_user, participation_id=participation_id, req=req)
+    s, created = svc.start_exam_session(db, student=current_user, participation_id=participation_id, req=req)
     db.commit()
     db.refresh(s)
+    if not created:
+        response.status_code = status.HTTP_200_OK   # resumed the active session (docs/41 R4)
     return s
 
 

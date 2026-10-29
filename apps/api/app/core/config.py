@@ -114,6 +114,14 @@ class Settings(BaseSettings):
     # REQ-TRACE-013, docs/39 D4: cadence clients should follow for CHECKPOINT snapshots
     TRACE_CHECKPOINT_INTERVAL_SECONDS: int = 60
 
+    # OQ-02 / docs/41 R1: login throttling; "memory" (per process) or "redis" (shared)
+    LOGIN_THROTTLE_BACKEND: str = "memory"
+    LOGIN_MAX_FAILURES: int = 5
+    LOGIN_WINDOW_SECONDS: int = 900
+    # OQ-01 / docs/41 R5: practice sessions idle this long are ended as ABANDONED
+    SESSION_STALE_HOURS: int = 24
+    SESSION_STALE_BATCH_SIZE: int = 200
+
     # Teacher notification WebSocket (docs/35 09C)
     WS_AUTH_TIMEOUT_SECONDS: float = 5.0
 

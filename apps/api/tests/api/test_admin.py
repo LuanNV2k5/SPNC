@@ -172,7 +172,8 @@ def test_concurrent_admin_demotion_preserves_one_usable_admin(admin_user, db_ses
         finally:
             session.close()
 
-    t1 = threading.Thread(target=worker, args=(admin_user.id, admin_user.id))
+    # docs/41 R2: admins cannot demote themselves, so the race is two admins demoting each other
+    t1 = threading.Thread(target=worker, args=(admin_user.id, admin2.id))
     t2 = threading.Thread(target=worker, args=(admin2.id, admin_user.id))
 
     t1.start()

@@ -58,7 +58,8 @@ def test_timeout_auto_submits_latest_snapshot_and_expires(db, running, enqueued)
     with_code = _exam_session(w, w["p1"])
     _snapshot(w["h_s"], with_code, "WRONG\n")
     latest = _snapshot(w["h_s"], with_code, "SUM\n")
-    no_code = _exam_session(w, w["p1"])
+    # docs/41 R4: one active session per participation and problem, so the session without code is stu2's
+    no_code = _session_for(w, w["p2"], w["h_s2"])
     _end_now(w["eid"])
     enqueued.clear()
 

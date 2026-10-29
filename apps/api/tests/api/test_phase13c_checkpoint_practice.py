@@ -99,5 +99,5 @@ def test_practice_list_scope_and_filters(db, world):
     assert client.get("/api/v1/my/practice/problems?difficulty=X", headers=w["h_s"]).status_code == 422
     assert client.get("/api/v1/my/practice/problems", headers=w["h_t"]).status_code == 403
 
-    # A student in no class sees PUBLIC only
+    # stu2's only class (the fixture's home class) has no CLASS problems: PUBLIC only
     assert _titles(w["h_s2"]) == (["Sum", "public-cpp"], 2)

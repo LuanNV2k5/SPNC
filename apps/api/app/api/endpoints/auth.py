@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -24,17 +24,31 @@ from app.models.user import User, AccountStatus
 
 
 
+from app.core.config import settings
+from app.services.login_throttle import login_throttle
+
 router = APIRouter()
 
 
 
 @router.post("/login", response_model=LoginResponse)
 
-def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+def login(request: Request, db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+
+    # OQ-02 (docs/41 R1): checked before the password so a blocked client learns nothing
+    client_ip = request.client.host if request.client else "-"
+    if login_throttle.is_blocked(form_data.username, client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"error_code": "LOGIN_RATE_LIMITED", "message": "Too many failed logins; try again later"},
+            headers={"Retry-After": str(settings.LOGIN_WINDOW_SECONDS)},
+        )
 
     user = auth_service.authenticate_user(db, form_data.username, form_data.password)
 
     if not user:
+
+        login_throttle.record_failure(form_data.username, client_ip)
 
         raise HTTPException(
 
@@ -56,6 +70,7 @@ def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = 
 
 
 
+    login_throttle.reset(form_data.username, client_ip)
     access_token, refresh_token = auth_service.create_tokens_for_user(db, user)
 
     return {

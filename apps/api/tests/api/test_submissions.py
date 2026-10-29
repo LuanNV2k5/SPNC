@@ -137,14 +137,18 @@ def _add_case(h, pid, inp, out, sample=False, weight=10):
 def world(db):
     _make_user(db, "teacher", "TEACHER")
     stu = _make_user(db, "stu", "STUDENT")
-    _make_user(db, "stu2", "STUDENT")
+    stu2 = _make_user(db, "stu2", "STUDENT")
     h_t, h_s, h_s2 = _auth("teacher"), _auth("stu"), _auth("stu2")
     pid = client.post("/api/v1/problems", json={"title": "Sum", "description": "d", "visibility": "PUBLIC",
                                                 "supported_languages": ["PYTHON3"]}, headers=h_t).json()["id"]
     _add_case(h_t, pid, "1 2\n", "3\n", sample=True, weight=10)
     _add_case(h_t, pid, "40 5\n", "45\n", weight=30)
     _add_case(h_t, pid, "100 1\n", "101\n", weight=60)
-    return {"h_t": h_t, "h_s": h_s, "h_s2": h_s2, "pid": pid, "student_id": stu.id}
+    # docs/41 R3 (REQ-PROB-003): students reach PUBLIC problems only through a class membership
+    home = client.post("/api/v1/classes", json={"name": "Home", "academic_year": "2026"}, headers=h_t).json()["id"]
+    for sid in (stu.id, stu2.id):
+        client.post(f"/api/v1/classes/{home}/members", json={"student_id": str(sid)}, headers=h_t)
+    return {"h_t": h_t, "h_s": h_s, "h_s2": h_s2, "pid": pid, "student_id": stu.id, "home_class": home}
 
 
 def _practice_session(w, h=None):

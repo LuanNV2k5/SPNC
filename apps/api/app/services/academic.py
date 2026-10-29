@@ -37,6 +37,11 @@ def _error(code: str, msg: str) -> dict:
     return {"error_code": code, "message": msg}
 
 
+def _student_enrolled(db: Session, student_id: uuid.UUID) -> bool:
+    """REQ-PROB-003 / OQ-10: PUBLIC problems are for students with an active class membership."""
+    return bool(repo.get_class_ids_for_student(db, student_id))
+
+
 # ============================================================
 # CLASS
 # ============================================================
@@ -170,7 +175,7 @@ def get_problem(db: Session, user: User, problem_id: uuid.UUID):
 
     if user_role == "STUDENT":
         vis = p.visibility if isinstance(p.visibility, str) else p.visibility.value
-        if vis == "PUBLIC":
+        if vis == "PUBLIC" and _student_enrolled(db, user.id):   # REQ-PROB-003, docs/41 R3
             return p
         if vis == "CLASS":
             student_class_ids = repo.get_class_ids_for_student(db, user.id)
@@ -217,7 +222,10 @@ def list_practice_problems(db: Session, student: User, skip: int, limit: int,
     return repo.get_practice_problems_for_student(db, student.id, skip=skip, limit=limit,
                                                   difficulty=difficulty, language=language)
 
-def list_public_problems(db: Session, skip: int, limit: int):
+def list_public_problems(db: Session, user: User, skip: int, limit: int):
+    role = user.role.value if hasattr(user.role, 'value') else user.role
+    if role == "STUDENT" and not _student_enrolled(db, user.id):   # REQ-PROB-003, docs/41 R3
+        return [], 0
     return repo.get_public_problems(db, skip=skip, limit=limit)
 
 def publish_to_class(db: Session, owner: User, problem_id: uuid.UUID, req: PublishToCLassRequest):
@@ -443,6 +451,8 @@ def start_practice_session(db: Session, student: User, req: StartPracticeSession
     vis = p.visibility if isinstance(p.visibility, str) else p.visibility.value
     if vis == "PRIVATE":
         raise HTTPException(status_code=403, detail=_error("PROBLEM_FORBIDDEN", "Problem is not accessible"))
+    if vis == "PUBLIC" and not _student_enrolled(db, student.id):   # REQ-PROB-003, docs/41 R3
+        raise HTTPException(status_code=403, detail=_error("PROBLEM_FORBIDDEN", "Join a class to practise public problems"))
     if vis == "CLASS":
         student_class_ids = repo.get_class_ids_for_student(db, student.id)
         if not student_class_ids or not repo.problem_published_to_class(db, req.problem_id, student_class_ids[0]):
@@ -537,6 +547,16 @@ def start_exam_session(db: Session, student: User, participation_id: uuid.UUID, 
             detail=_error("LANGUAGE_NOT_SUPPORTED", f"Language {req.language} not supported"),
         )
 
+    # OQ-01 (docs/41 R4): one ACTIVE exam session per participation and problem; starting again resumes it.
+    # The participation row lock serializes concurrent starts.
+    repo.lock_participation(db, participation_id)
+    existing = repo.get_active_exam_session(db, participation_id, req.problem_id)
+    if existing is not None:
+        if existing.language != req.language:
+            raise HTTPException(status_code=409, detail=_error(
+                "EXAM_SESSION_ALREADY_ACTIVE",
+                f"An active {existing.language} session exists for this problem; end or submit it first"))
+        return existing, False
     return repo.create_exam_session(
         db,
         student_id=student.id,
@@ -544,7 +564,7 @@ def start_exam_session(db: Session, student: User, participation_id: uuid.UUID, 
         language=req.language,
         exam_participation_id=participation_id,
         idle_threshold_seconds=system_settings.idle_threshold_seconds(db),   # docs/39 D3
-    )
+    ), True
 
 def get_exam_session(db: Session, student: User, session_id: uuid.UUID):
     s = repo.get_session_by_id(db, session_id)
