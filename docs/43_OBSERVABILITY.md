@@ -126,4 +126,33 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 
 ## 7. Verification Record
 
-_Empty until implementation._
+### 7.1 Changes (2026-10-29)
+| Commit | Content |
+|---|---|
+| `33fcbab` | This specification (draft) |
+| `99d0732` | Spec approval (PROJECT_PROVENANCE_LOG) |
+| `afe6352` | `app/core/metrics.py`, `app/core/logging.py`, `app/services/health.py`, `app/api/endpoints/health.py`, `app/serve.py` (new Docker `CMD`); instrumentation in `main.py` (middleware, request-id validation, 500 handler), `services/trace.py`, `storage.py`, `snapshot_cleanup.py`, `submission.py`, `observation.py`, `session_lifecycle.py`, `queue.py`, `api/endpoints/ws.py`, `worker.py`, `reconciler.py`, both schedulers; `prometheus_client==0.25.0`; settings `METRICS_PORT`, `LOG_FORMAT`, `LOG_LEVEL`, `READY_CHECK_TIMEOUT_SECONDS`; `tests/api/test_phase17_observability.py` (23 tests, group `phase10plus`); compose E2E test for the probes and a CI step that reads port 9100 in every container; RUNBOOK §6 "Observability" |
+
+### 7.2 Implementation Notes (within the approved decisions)
+- **Route template.** FastAPI 0.141 keeps the router prefix outside the matched route (`scope["route"].path` is `/{session_id}/runs`), so the middleware rebuilds the template from the request path, putting each path parameter back as `{name}` (`/api/v1/my/coding-sessions/{session_id}/runs`).
+- **Masking** (§3.5) is done in the formatters rather than a `logging.Filter`, so it covers the message, every context field and tracebacks alike.
+- **Database probe** uses its own one-connection pool (`pool_pre_ping`), not `NullPool`: frequent probes reuse one connection instead of opening one each time, and never borrow from the request pool.
+- **Extra series** beyond §3.1, both bounded: `trace_ingest_batch_rejected_total` (docs/07 §4.1 name; equals `trace_ingest_batch_total{outcome="rejected"}`) and `judge_enqueue_failure_total{kind}` (F4).
+- **Test logging.** Alembic's `fileConfig` (run by the test database setup) disables existing loggers; the log-capturing fixture re-enables them. The API process does not run Alembic, so this is test-only.
+- On Windows a new connection to `localhost` tries `::1` first and needs about 2 s to fall back to `127.0.0.1`; the observability tests raise the probe timeout to 5 s for that reason only. Containers address PostgreSQL by service name and are unaffected.
+
+### 7.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| AC-17-01…06 `test_phase17_observability.py` | this machine, own PostgreSQL 16 on port 55432, Redis, MinIO (19000) | **23 passed** |
+| Isolated local regression: groups `signals`, `observation`, `phase10plus` with `PHASE08E/09/10_DATABASE_URL` exported to the own database | same | **297 passed, 0 failed** (35 files) |
+| Groups `auth`, `academic`, `judge` locally | — | **not run locally.** Seven older test files hard-code `localhost:5432` (`test_auth`, `test_admin`, `test_academic`, `test_trace`, `test_run`, `test_fencing`, `test_queue`), so a local run cannot keep them off the shared container. An earlier full local run (553 passed, 3 failed files) touched the shared container while Phase 18 was running against the same databases; its failures were collisions there (FK violation in `test_queue` cleanup, tokens expired during a 17-minute lock wait, mismatched engines). Those groups are verified on CI below. Follow-up: make those seven files honour the environment. |
+| AC-17-07 CI on push `afe6352` | GitHub-hosted `ubuntu-24.04`, run 40880688072 | all 6 groups green, `ci` green |
+| AC-17-07 compose E2E | `workflow_dispatch` on `phase17`, run 40882067424 | **5 passed** (incl. `/health`, `/ready` all ok, `/metrics` 404 on the public port); port 9100 served by `api`, `worker`, `reconciler`, `signal-scheduler`, `exam-scheduler`; all 6 groups and `ci` green |
+| Image smoke test | `docker build` of `apps/api`, `python -m app.serve` against the own PostgreSQL and Redis | `/health` 200, `/ready` 200; JSON log lines with `request_id`; a request with `?token=SHOULD_NOT_APPEAR` is logged without its query string; `http_requests_total` by route template on port 9100 |
+
+### 7.4 Follow-ups (not in this phase)
+- Deferred metrics (§3.1): `trace_sequence_gap_total`, separate `run_pending_stale_total` / `run_running_stale_total`, `run_duplicate_delivery_total`, `websocket_revocation_disconnect_total`, `websocket_reconnect_total`, PostgreSQL pool utilisation.
+- Compose `healthcheck:` for `api` using `/ready` (compose owner).
+- Prometheus server, dashboards and alert rules A1–A10 (production-infrastructure step).
+- Test files that hard-code `localhost:5432` (§7.3).
