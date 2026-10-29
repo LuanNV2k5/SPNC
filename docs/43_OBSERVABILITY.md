@@ -1,7 +1,7 @@
 # 43 — OBSERVABILITY (PHASE 17 / STEP 2) SPECIFICATION
 
 > **Module:** metrics, health/readiness probes, structured logs, log hygiene
-> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md)
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-17-observability-locked`, on the merge commit of the lock PR)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-16-ci-locked` (`0ad5a9b`, = `main`)
 > **Proposed Branch:** `phase17`
