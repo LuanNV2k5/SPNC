@@ -1,7 +1,7 @@
 # 46 — FRONTEND FOUNDATION AND STUDENT PRACTICE (PHASE 20A) SPECIFICATION
 
 > **Module:** web client (`apps/web`): foundation, authentication, student practice flow with trace capture
-> **Status:** DRAFT — awaiting Project Owner approval of §6
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-19-retention-locked` (`5c77f97`; `main` = `5c92774`, docs-only roadmap PR #9 on top)
 > **Proposed Branch:** `phase20a`
@@ -169,7 +169,7 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 ### 7.1 Changes
 | Commit | Content |
 |---|---|
-| | |
+| `ce0b0b0` | This specification (draft) |
 
 ### 7.2 Implementation Notes (within the approved decisions)
 _None yet._

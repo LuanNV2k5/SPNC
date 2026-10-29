@@ -804,3 +804,19 @@ Decisions (recorded in `docs/ROADMAP.md`):
 - The frontend is the next phase. Its specification must decide how the browser reaches the API: CORS with a configured origin list, a same-origin reverse proxy, or both. The backend has no CORS configuration today.
 - Go-live gate G1 (hard): before the first real user, G1.1 an encrypted off-host backup copy with one verified restore from it, and G1.2 minimal alerting (backup failed or stale, daemon stale, `/ready` failing, judge backlog, disk usage). Each is done through its own locked phase. Until then deployments hold only test or demo data.
 - Deferred, no fixed order: load test (after the frontend), compose `api` healthcheck, the docs/43 deferred metrics, dashboards, enabling the daily retention purge, trace partitioning, trace export and audit-log expiry.
+
+---
+
+## Decision: Phase 20A Frontend Foundation Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve all" (reply to "Do you approve all 13 recommendations in docs/46 §6?"). All recommendations D1–D13 in `docs/46_FRONTEND_FOUNDATION.md` §6 are approved without overrides.
+
+Approved Decisions (summary):
+D1 React + TypeScript + Vite SPA in `apps/web` (supersedes "Next.js" in docs/07/10); D2 TanStack Query + React Router; D3 API client generated from `app.openapi()` with pinned `openapi-typescript` + `openapi-fetch`, generated files committed, CI fails when stale; D4 Mantine; D5 Monaco via `@monaco-editor/react`, bundled locally; D6 same origin (Vite dev proxy, NGINX in production), no CORS, no backend change, no WebSocket `Origin` check in 20A (re-evaluated in 20B); D7 access token in memory, refresh token in `localStorage`, cross-tab single-flight refresh via Web Locks, strict CSP; D8 pure TS trace module, persist-before-send in IndexedDB, batching, backoff, flush barrier before submit/end, single writer per session; D9 client event payload contract (one `EDITOR_CHANGED` per change with the docs/01 fields, no coalescing); D10 resume an ACTIVE practice session only when this browser holds its draft, otherwise end it and start a new one; D11 Vitest + backend contract test + `web` job folded into `ci`, Playwright in `web-e2e` with the compose-e2e cadence plus a recorded local run before lock; D12 Vietnamese UI, one strings file; D13 `apps/web` NGINX image and one new compose service `web`.
