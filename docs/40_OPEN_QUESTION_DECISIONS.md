@@ -1,7 +1,7 @@
 # 40 — DECISIONS FOR OQ-16, OQ-26, OQ-27 (PHASE 14) PROPOSAL
 
 > **Module:** Practice points (REQ-STU-004), production judge isolation, exam duration semantics
-> **Status:** APPROVED 2026-10-29 (Q1–Q5 as recommended; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-29 (Q1–Q5 as recommended; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTED AND VERIFIED 2026-10-29 (§6); lock tag pending Project Owner review
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-13-backend-complete-locked` (`409cd97`)
 > **Proposed Branch:** `phase14`
@@ -91,3 +91,30 @@ Tests: points awarded once, not for exams, not for WRONG_ANSWER, not for SYSTEM_
 | **Q3** | Points reset | **Never** |
 | **Q4** | OQ-26 isolation: A / B / C / D | **A** (dedicated judge VM + gVisor + least-privilege DB role) |
 | **Q5** | OQ-27 meaning: A / B / C | **A** (confirm the Phase 12 behaviour) |
+
+---
+
+## 6. Verification Record
+
+### 6.1 Changes (2026-10-29)
+| Item | Commit | Files |
+|---|---|---|
+| Decisions | `793cbb1` | OPEN_QUESTIONS (OQ-16, OQ-26, OQ-27 resolved), PROJECT_PROVENANCE_LOG |
+| 14A points | `3aea9a9` | migration `b2d8f5a9c314`; `PointTransaction.problem_id/submission_id`; `services/points.py`; `schemas/points.py`; `api/endpoints/points.py`; `services/submission.py` (award in the judge transaction) |
+| 14B judge isolation | `7c30625` | `JUDGE_CONTAINER_RUNTIME` (config + `judge/sandbox.py`); `deploy/sql/judge_worker_role.sql`; `deploy/judge-host/docker-compose.yml`; RUNBOOK §8 |
+
+### 6.2 Notes and Deviations
+- **Ledger table:** §4 named a new `point_awards` table. The Phase 02 schema already had an unused `point_transactions` ledger (student, signed amount, reason, source reference), so 14A reuses it instead of adding a duplicate. It adds `problem_id`/`submission_id` and a partial unique index `(student_id, problem_id) WHERE reason = 'PRACTICE_ACCEPTED'`. Behaviour is as decided; the signed amount leaves room for later corrections.
+- **Award rule:** in `judge_submission`, after the fenced write succeeds with COMPLETED, for a submission with no exam, source STUDENT and verdict ACCEPTED: `INSERT … ON CONFLICT DO NOTHING`. Same transaction as the result, so a stale generation or rollback never awards. Points: EASY 10, MEDIUM 20, HARD 30, none 10.
+- **Read APIs:** `GET /my/points` (student) and `GET /classes/{c}/students/{s}/points` (owner teacher, active member) return `{student_id, total, transactions[]}`. There is no ranking or leaderboard endpoint.
+- **Role script gaps found by the role test:** `INSERT … ON CONFLICT` against a partial index needs SELECT on the inferred columns, and the Phase 09C run notify trigger (which runs with the caller's privileges) reads `coding_sessions.student_id`. Both are granted at column level only.
+- **gVisor not exercised on this machine** (Windows / Docker Desktop). The runtime setting is verified to reach container creation; real `runsc` execution must be confirmed on a Linux judge host (RUNBOOK §8 step 6).
+
+### 6.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| Migration `b2d8f5a9c314` | Empty DB, PostgreSQL 16.15 | up / down / up OK; partial unique index as specified |
+| 14A `test_phase14a_points.py` | Disposable PostgreSQL 16.15, `spnc_phase10_submission_test` | **5 passed** (once per problem, difficulty values, none for WRONG_ANSWER / FAILED_INTERNAL / exam, stale generation and duplicate delivery award once, points survive problem deletion, teacher scope) |
+| 14B `tests/infra/test_judge_isolation.py` | same | **11 passed** (runtime pass-through and default; practice, exam and Run jobs complete as `spnc_judge`; 8 forbidden statements denied) |
+| Full regression Phase 03–14 | Fresh per-phase DBs migrated to head; Redis; Docker sandbox; MinIO | **527 passed, 0 failed** (43 files) |
+| Demo compose stack rebuilt from `phase14` | Docker Desktop (Windows host) | migration applied; E2E **4 passed**; live: two ACCEPTED submissions on a HARD problem → total 30, one award |
