@@ -1,7 +1,7 @@
 # 42 — CONTINUOUS INTEGRATION & BRANCH PROTECTION (PHASE 16 / STEP 1) SPECIFICATION
 
 > **Module:** GitHub Actions CI, protection of `main`, small technical-debt fixes
-> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTATION IN PROGRESS
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — IMPLEMENTED AND VERIFIED 2026-10-29 (§7); lock tag pending Project Owner review
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-15a-oq-review-locked` (`efdabd3`, = `main`)
 > **Proposed Branch:** `phase16`
@@ -119,5 +119,11 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md`. Setting branch protect
 | AC-16-03 gate | throwaway branch `ci-red-check` with one failing test, run 40812579919 | `tests (phase10plus)` red, `ci` **red**; branch deleted afterwards |
 | Flake diagnosis | runs 40812561193, 40812937066 | `academic` red; annotation named `test_trace.py::test_t05_threaded_concurrency` (§7.2) |
 | After the fix (`511b16a`) | run 40813746009 | all 6 groups green, `ci` green, including `t05b` on GitHub runners |
-| AC-16-04 compose E2E | | *pending: runs on the first push to `main` after merge* |
-| AC-16-05 branch protection | | *pending: needs `gh auth login` (D5)* |
+| AC-16-04 compose E2E | first push to `main` (`e5178bf`), run 40816427936 | **passed in 95 s**: stack built on the runner, admin bootstrapped, Run and submissions judged by the worker container, WebSocket OK; all 6 regression groups and `ci` green on the same run |
+| AC-16-05 branch protection | `gh api PUT …/branches/main/protection` after `gh auth login` (D5) | active: PR required, `ci` required and strict, admins included, 0 approvals, no force push, no deletion. A direct push of a probe commit to `main` was **rejected** ("Changes must be made through a pull request", "Required status check \"ci\" is expected"); `main` unchanged |
+| PR flow | [LuanNV2k5/SPNC#1](https://github.com/LuanNV2k5/SPNC/pull/1) | required `ci` green on the PR run; merged with a merge commit (`e5178bf`) so recorded hashes stay valid. Repository `allow_auto_merge` enabled at the owner's request (2026-10-29) for later PRs |
+
+### 7.4 Working Agreement From Now On
+- `main` changes only through a pull request with `ci` green; that includes phase lock commits. Lock tags are created on the merged commit.
+- PRs are merged with a merge commit (not squash or rebase) so commit hashes recorded in docs stay valid.
+- New test files must be added to a group in `scripts/ci/regression.sh`; CI fails otherwise.
