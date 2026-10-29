@@ -1,7 +1,7 @@
 # 39 — BACKEND COMPLETION: SHOULD GAPS & STORAGE HYGIENE (PHASE 13) SPECIFICATION
 
 > **Module:** Snapshot key fix, orphan-blob cleanup, admin idle threshold, checkpoint linkage, student practice list (Phase 13)
-> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — 13A/13B/13C IMPLEMENTED AND VERIFIED 2026-10-29 (§8); lock tag pending Project Owner review
+> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-13-backend-complete-locked`)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase12` @ `9a4bad6` (Phases 10–12 implemented, locks pending)
 > **Proposed Branch:** `phase13`
@@ -110,7 +110,7 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md`, with DCRs for D1 (snap
 | Approval | `eff23c1` | PROJECT_PROVENANCE_LOG (spec approval; DCRs SPNC_SNAPSHOT_CONTENT_KEY, SPNC_CHECKPOINT_LINKAGE) |
 | 13A | `2aef0cd` | migration `f9b5d3e6a012`; `models/trace.py` (`object_key` index, not unique); `services/storage.py` (key `snapshots/{session}/{sha256}.txt`, `list_code_snapshots`, `delete_code_snapshot`); `services/snapshot_cleanup.py`; `reconciler.py` (`maybe_sweep_orphans`); config `SNAPSHOT_ORPHAN_*` |
 | 13B | `048a824` | migration `a1c7e4f8b213`; `coding_sessions.idle_threshold_seconds`; `services/system_settings.py`; admin settings endpoint/schemas; session creation captures the threshold; `judge/signals.py` (`_idle_threshold(session)`) |
-| 13C | this commit | `services/trace.py` (`_validate_checkpoints`), trace-state `checkpoint_interval_seconds` (config `TRACE_CHECKPOINT_INTERVAL_SECONDS`), `GET /my/practice/problems` (repo/service/endpoint) |
+| 13C | `95a7473` | `services/trace.py` (`_validate_checkpoints`), trace-state `checkpoint_interval_seconds` (config `TRACE_CHECKPOINT_INTERVAL_SECONDS`), `GET /my/practice/problems` (repo/service/endpoint) |
 
 ### 8.2 Behaviour Notes
 - **Snapshots:** identical code in one session now yields separate snapshot rows that share one blob. Old `…/0_{hash8}.txt` keys still read. The migration's downgrade re-adds the UNIQUE constraint and therefore fails once rows share a key; that is expected.

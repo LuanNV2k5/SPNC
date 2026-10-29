@@ -525,3 +525,30 @@ REQ-TRACE-013 requires the event to reference its snapshot; Phase 06 accepted an
 
 Compatibility:
 Phase 06 clients sending unlinked checkpoints now get 422. Stored events are not modified.
+
+---
+
+## Decision: Phase 10–13 Lock
+
+Date:
+2026-10-29
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Khóa Phase 10–13".
+
+Locked Baselines:
+| Phase | Spec | Lock commit | Tag | Verification |
+|---|---|---|---|---|
+| 10 Submission & exam lifecycle | docs/36 | `391a5bc` | `phase-10-submission-locked` | 469 passed (Phase 03–10) |
+| 11 Shared storage & compose | docs/37 | `f94fb85` | `phase-11-infra-locked` | 476 passed, MinIO adapter 6, compose E2E 4 |
+| 12 MUST gap closure | docs/38 | `f636a37` | `phase-12-must-gaps-locked` | 499 passed, compose E2E 4 |
+| 13 Backend completion | docs/39 | this commit | `phase-13-backend-complete-locked` | 511 passed, compose E2E 4 |
+
+Lineage:
+Each phase branch was merged forward into the next (phase10 → phase11 → phase12 → phase13) after its lock commit, so commit hashes recorded in docs/36–39 are unchanged. Tags are local; nothing was pushed.
+
+Open after lock:
+OQ-16 (points, blocks REQ-STU-004), OQ-26 (production judge isolation), OQ-27 (`duration_minutes` meaning), frontend.
