@@ -96,4 +96,28 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md`. Setting branch protect
 
 ## 7. Verification Record
 
-*To be completed at Phase 16 closure.*
+### 7.1 Changes (2026-10-29)
+| Commit | Content |
+|---|---|
+| `1e773b8` | Spec approval (PROJECT_PROVENANCE_LOG) |
+| `0220641` | `scripts/ci/regression.sh`, `.github/workflows/ci.yml`, `.gitattributes`; dead `Settings` copy removed from `config.py` (its `Optional` import was the only one, now on the live class); `ConfigDict` in `schemas/run.py`, `schemas/trace.py`; sandbox `prepare_workspace` for a non-root Linux worker |
+| `0af52fd` | `regression.sh mapping`: CI fails when a test file belongs to no group |
+| `ec5a9da` | Failing test ids emitted as annotations (readable without login); `actions/checkout@v5`, `actions/setup-python@v6` (Node 20 deprecation) |
+| `511b16a` | Concurrent identical trace batches fix (§7.2) |
+
+### 7.2 Defects Found by CI
+- **Trace batch race (Phase 06, REQ-TRACE-009).** `test_trace.py::test_t05_threaded_concurrency` failed on 2 of 3 GitHub runs and never locally. `bulk_insert_events` checked for existing rows, then inserted. Two identical batches racing (client retries, OQ-13) both saw "absent", and the loser's unique-constraint error became 409 `TraceConflictError`, although its batch was an exact duplicate. The fix is `INSERT … ON CONFLICT (session_id, sequence_number) DO NOTHING RETURNING`, then fingerprint comparison for the sequence numbers that already existed; different content is still 409. New tests: `t05b` (20 identical batches at once × 5 rounds) **fails on the old code with a 409 and passes on the new code**; `t05c` (conflicts still rejected, a mixed batch stores nothing).
+- **Sandbox on a non-root Linux worker.** Workspaces were 0700 and owned by the worker, so the sandbox uid could not read the code. This was invisible on Windows/Docker Desktop. A root worker still chowns; a non-root worker now opens the per-run directory's modes.
+- **Dead `Settings` copy hid a missing import.** Deleting it made `Optional` undefined in the live class; fixed.
+
+### 7.3 Verification
+| Check | Environment | Result |
+|---|---|---|
+| AC-16-01 `scripts/ci/regression.sh all` | This machine, disposable PostgreSQL 16.15, Redis, MinIO, Docker sandbox | **538 passed, 0 failed** (44 files). Per-file comparison with the Phase 15A run differs only in `test_trace.py` (15 → 17). The Phase 15A baseline was therefore **536**; the lock entry's "536 + 8" counted the re-run file twice. |
+| `regression.sh mapping` | same | passes with 44 files; a temporary unmapped file makes it exit 1 |
+| AC-16-02 first CI run (`0220641`) | GitHub-hosted `ubuntu-24.04`, run 40812182447 | all 6 groups green, `ci` green; slowest group 141 s |
+| AC-16-03 gate | throwaway branch `ci-red-check` with one failing test, run 40812579919 | `tests (phase10plus)` red, `ci` **red**; branch deleted afterwards |
+| Flake diagnosis | runs 40812561193, 40812937066 | `academic` red; annotation named `test_trace.py::test_t05_threaded_concurrency` (§7.2) |
+| After the fix (`511b16a`) | run 40813746009 | all 6 groups green, `ci` green, including `t05b` on GitHub runners |
+| AC-16-04 compose E2E | | *pending: runs on the first push to `main` after merge* |
+| AC-16-05 branch protection | | *pending: needs `gh auth login` (D5)* |
