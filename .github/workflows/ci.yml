@@ -61,6 +61,7 @@ jobs:
       - name: Start MinIO for storage tests
         if: matrix.group == 'phase10plus'
         run: |
+          bash scripts/ci/pull_with_retry.sh "$MINIO_IMAGE"
           docker run -d --name spnc-minio-test -p 127.0.0.1:19000:9000 \
             -e MINIO_ROOT_USER=spnc-test -e MINIO_ROOT_PASSWORD=spnc-test-password \
             --tmpfs /data:uid=65532,gid=65532 "$MINIO_IMAGE" server /data
@@ -68,9 +69,7 @@ jobs:
 
       - name: Pull sandbox images
         if: matrix.group == 'judge'
-        run: |
-          docker pull python:3.10-slim
-          docker pull gcc:12
+        run: bash scripts/ci/pull_with_retry.sh python:3.10-slim gcc:12
 
       - name: Every test file is in a group
         if: matrix.group == 'auth'
@@ -112,9 +111,7 @@ jobs:
           } > .env
 
       - name: Pull sandbox images
-        run: |
-          docker pull python:3.10-slim
-          docker pull gcc:12
+        run: bash scripts/ci/pull_with_retry.sh python:3.10-slim gcc:12
 
       - name: Start the stack
         run: |
