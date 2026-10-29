@@ -31,3 +31,7 @@ Thumbs.db
 # Python tooling
 .mypy_cache/
 .ruff_cache/
+
+# Backup sets (docs/44): contain personal data, never committed
+backups/
+.drill/

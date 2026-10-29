@@ -715,6 +715,43 @@ Groups auth/academic/judge were verified on CI only: seven older test files hard
 
 ---
 
+## Decision: Phase 18 Backup & Restore Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve both" (reply to "Approve all recommendations in both specs?", covering docs/43 Phase 17 and docs/44 Phase 18). All recommendations D1–D7 in `docs/44_BACKUP_AND_RESTORE.md` §7 are approved without overrides.
+
+Approved Decisions (summary):
+D1 daily logical `pg_dump --format=custom` (WAL/PITR is the upgrade path); D2 daily at 19:00 UTC, configurable `BACKUP_TIME_UTC`, plus manual runs; D3 key list and dump from one exported snapshot, copy only referenced blobs with hash check, a missing blob fails the backup; D4 `backup` service in `docker-compose.yml`; D5 self-contained set per backup in `${BACKUP_DIR:-./backups}`, keep newest 14, effective retention 180 + 14 days documented; D6 restore drill script run now and as a nightly/on-demand CI job (not a required check); D7 no tool-level encryption in V1, `0700` directory, runbook requires an encrypted off-host copy.
+
+---
+
+## Decision: Phase 18 Lock
+
+Date:
+2026-10-29
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Merge when green" (PR #5), then "Lock Phase 18".
+
+Locked Baseline:
+| Phase | Spec | Merged via | Tag | Verification |
+|---|---|---|---|---|
+| 18 Backup & restore | docs/44 | PR #5 (`bad0dc9`), lock PR (this commit) | `phase-18-backup-locked` on the merge commit of the lock PR | restore drill passed on this machine (restore 22 s, 20 s after merging Phase 17; RTO 4 h) and on GitHub (`backup-drill`); scheduled backup and pruning checked; local `regression.sh all` on a disposable PostgreSQL 580 passed, 0 failed (557 before merging Phase 17); GitHub Actions all 6 groups green on PR #5 |
+
+Note:
+The local regression now honours `PG_BASE` for every test file (docs/44 §8.2), so all groups, auth/academic/judge included, can be verified locally off the shared container. This closes the follow-up recorded in the Phase 17 lock entry.
+
+---
+
 ## Decision: Phase 19 Retention Purge Specification Approval
 
 Date:
