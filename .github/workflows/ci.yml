@@ -140,6 +140,13 @@ jobs:
           DATABASE_URL=postgresql://unused:unused@localhost/unused \
           python -m pytest tests/e2e/test_compose_stack.py -q -p no:warnings
 
+      - name: Metrics port in every process (docs/43 D3/D5)
+        run: |
+          for s in api worker reconciler signal-scheduler exam-scheduler; do
+            docker compose exec -T "$s" python -c "import urllib.request as u; b = u.urlopen('http://127.0.0.1:9100/metrics', timeout=5).read().decode(); assert '# TYPE judge_queue_depth gauge' in b, b[:300]; print('$s metrics ok')"
+          done
+          docker compose logs --tail 3 api reconciler
+
       - name: Stack logs on failure
         if: failure()
         run: docker compose logs --tail 200 api worker

@@ -95,6 +95,12 @@ class Settings(BaseSettings):
     # Teacher notification WebSocket (docs/35 09C)
     WS_AUTH_TIMEOUT_SECONDS: float = 5.0
 
+    # Phase 17 observability (docs/43): internal metrics port per process (0 = off), JSON or text logs
+    METRICS_PORT: int = 9100
+    LOG_FORMAT: str = "json"
+    LOG_LEVEL: str = "INFO"
+    READY_CHECK_TIMEOUT_SECONDS: float = 2.0
+
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 
 

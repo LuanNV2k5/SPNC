@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.config import settings
 
 from app.models.session import CodingSession, SessionStatus, TerminationSource
@@ -55,6 +56,8 @@ def finalize_session(
     try:
         if snapshot and storage_adapter.exists_code_snapshot(snapshot.object_key):
             final_loc = count_loc(storage_adapter.download_code_snapshot(snapshot.object_key))
+        elif snapshot:
+            metrics.SNAPSHOT_BLOB_MISSING.labels(reader="session_end").inc()
     except StorageUnavailable:
         # Content unreachable: same as unavailable, never a fabricated LOC (docs/37 §4)
         final_loc = None

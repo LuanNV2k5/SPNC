@@ -20,4 +20,5 @@ RUN useradd --uid 10001 --create-home spnc
 USER spnc
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# docs/43 §3.2: JSON logs + internal metrics port 9100 (not published), then uvicorn
+CMD ["python", "-m", "app.serve"]

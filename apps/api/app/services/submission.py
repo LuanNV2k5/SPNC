@@ -12,6 +12,7 @@ from typing import Any, Dict, Mapping, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.models.exam import Exam, ExamParticipation, ExamStatus, ParticipationStatus
 from app.models.problem import Problem
 from app.models.run_submit import RunStatus, RunVerdict, Submission, SubmissionSource
@@ -134,6 +135,9 @@ def _fail(db: Session, submission_id: uuid.UUID, generation: int, message: str) 
         {"internal_error": message},
     )
     db.commit()
+    metrics.JUDGE_FAILURES.labels(kind="submission").inc()
+    if not written:
+        metrics.FENCING_REJECTIONS.labels(kind="submission").inc()
     return written
 
 
@@ -145,7 +149,9 @@ def judge_submission(db: Session, submission_id: uuid.UUID, adapters: Optional[M
 
     submission = submission_repo.claim_for_judging(db, submission_id)
     if not submission:
-        logger.info(f"Worker skipped submission {submission_id}, either not PENDING or CAS failed.")
+        logger.info(f"Worker skipped submission {submission_id}, either not PENDING or CAS failed.",
+                    extra={"submission_id": submission_id})
+        metrics.CLAIM_CONFLICTS.labels(kind="submission").inc()
         return False
     generation = submission.execution_generation
 
@@ -159,8 +165,10 @@ def judge_submission(db: Session, submission_id: uuid.UUID, adapters: Optional[M
             available = storage_adapter.exists_code_snapshot(snapshot.object_key)
             source_code = storage_adapter.download_code_snapshot(snapshot.object_key) if available else None
         except StorageUnavailable:
-            available = False
+            available = None   # outage, not a missing blob
         if not available:
+            if available is False:
+                metrics.SNAPSHOT_BLOB_MISSING.labels(reader="worker_submission").inc()
             return _fail(db, submission_id, generation, "Snapshot content unavailable")
 
         test_cases = submission_repo.load_test_cases(db, submission.problem_id)
@@ -175,9 +183,10 @@ def judge_submission(db: Session, submission_id: uuid.UUID, adapters: Optional[M
             score_base = PRACTICE_SCORE_BASE
 
         problem = db.get(Problem, submission.problem_id)
-        outcome = grade(adapter, source_code, test_cases, score_base, problem.time_limit_ms, problem.memory_limit_mb)
+        with metrics.JUDGE_DURATION.labels(kind="submission").time():
+            outcome = grade(adapter, source_code, test_cases, score_base, problem.time_limit_ms, problem.memory_limit_mb)
     except Exception:
-        logger.exception(f"Unhandled error judging submission {submission_id}")
+        logger.exception(f"Unhandled error judging submission {submission_id}", extra={"submission_id": submission_id})
         db.rollback()
         return _fail(db, submission_id, generation, "Judge error")
 
@@ -188,10 +197,14 @@ def judge_submission(db: Session, submission_id: uuid.UUID, adapters: Optional[M
     written = submission_repo.write_result(
         db, submission.id, generation, status, outcome["verdict"].value, score, outcome["judge_result"],
     )
+    if status == RunStatus.FAILED_INTERNAL:
+        metrics.JUDGE_FAILURES.labels(kind="submission").inc()
     if not written:
         # A newer generation owns this submission (reconciler recovery); drop the stale result
         db.rollback()
-        logger.info(f"Stale result for submission {submission_id} generation {generation} rejected")
+        logger.info(f"Stale result for submission {submission_id} generation {generation} rejected",
+                    extra={"submission_id": submission_id, "execution_generation": generation})
+        metrics.FENCING_REJECTIONS.labels(kind="submission").inc()
         return False
     if submission.exam_id:
         submission_repo.recompute_exam_total(db, submission.exam_id, submission.student_id)
@@ -210,6 +223,7 @@ def recover_stale_submissions(db: Session, threshold_seconds: int) -> int:
         fresh = submission_repo.recover_stale(db, sub.id, sub.execution_generation)
         if fresh:
             judge_queue.enqueue_submission(fresh.id)
+            metrics.REENQUEUES.labels(kind="submission").inc()
             recovered += 1
         else:
             logger.info(f"Failed to claim stale submission {sub.id} (already recovered by another process)")

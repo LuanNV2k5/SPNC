@@ -5,9 +5,10 @@ from datetime import datetime, timezone, timedelta
 
 from app.db.session import SessionLocal
 from app.core.config import settings
+from app.core import metrics
+from app.core.logging import configure_logging
 from app.services.judge.materializer import run_cycle, process_outbox_cycle
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 shutdown_event = threading.Event()
@@ -39,8 +40,10 @@ def run_scheduler_loop():
                     seconds=settings.SIGNAL_SCHEDULER_INTERVAL_SECONDS * 2
                 )
                 run_cycle(db, since_dt)
+            metrics.record_cycle("signal_scheduler", ok=True)
         except Exception as e:
             logger.error(f"Scheduler cycle error: {e}")
+            metrics.record_cycle("signal_scheduler", ok=False)
             
         # Interruptible sleep: wakes up immediately if shutdown_event is set
         shutdown_event.wait(timeout=settings.SIGNAL_SCHEDULER_INTERVAL_SECONDS)
@@ -48,4 +51,6 @@ def run_scheduler_loop():
     logger.info("Signal Scheduler shutdown complete.")
 
 if __name__ == "__main__":
+    configure_logging(daemon="signal_scheduler")
+    metrics.start_metrics_server()
     run_scheduler_loop()

@@ -678,6 +678,43 @@ First phase locked under branch protection: the lock commit reached `main` throu
 
 ---
 
+## Decision: Phase 17 Observability Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve both" (reply to "Approve all recommendations in both specs?", covering `docs/43_OBSERVABILITY.md` and the Phase 18 spec). All recommendations D1–D7 in `docs/43_OBSERVABILITY.md` §6 are approved without overrides.
+
+Approved Decisions (summary):
+D1 `prometheus_client`, Prometheus text exposition; D2 every docs/07 §4 metric that maps to an existing code path plus HTTP and daemon-cycle metrics, the rest deferred as follow-ups; D3 each process (API and four daemons) serves its own registry; D4 `/health` liveness without checks and `/ready` readiness (PostgreSQL, Redis, storage), root path, no auth, 503 `NOT_READY` per rule #29; D5 metrics on an internal port `METRICS_PORT` (9100), never on the public API port, no auth; D6 JSON log lines via stdlib `logging` with `request_id` from a contextvar, request-id validation, generic 500 handler; D7 never-log list, redaction filter, automated marker test.
+
+---
+
+## Decision: Phase 17 Lock
+
+Date:
+2026-10-29
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Merge when green" (PR #3), then "Lock Phase 17".
+
+Locked Baseline:
+| Phase | Spec | Merged via | Tag | Verification |
+|---|---|---|---|---|
+| 17 Observability | docs/43 | PR #3 (`e00e42b`), lock PR (this commit) | `phase-17-observability-locked` on the merge commit of the lock PR | `test_phase17_observability.py` 23 passed; isolated local groups signals/observation/phase10plus 297 passed; GitHub Actions all 6 groups green on PR #3 and compose E2E green on `phase17` (probes, port 9100 in all five containers) |
+
+Note:
+Groups auth/academic/judge were verified on CI only: seven older test files hard-code `localhost:5432`, so a local run cannot keep them off the shared container (docs/43 §7.3, follow-up §7.4).
+
+---
+
 ## Decision: Phase 18 Backup & Restore Specification Approval
 
 Date:

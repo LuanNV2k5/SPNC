@@ -53,6 +53,11 @@ docker compose logs -f api worker
 | Sandbox `Image not found` | Pull the images in §1. |
 | Worker cannot reach Docker | `/var/run/docker.sock` must exist on the host (Docker Desktop: enabled by default). |
 
+### Observability (docs/43)
+- Probes: `curl http://127.0.0.1:8000/health` (process alive) and `curl http://127.0.0.1:8000/ready` (503 `NOT_READY` names the failed dependency: `database`, `redis` or `storage`; the reason is in the API log).
+- Logs are JSON lines carrying `request_id` (also returned as the `X-Request-ID` header): `docker compose logs api | grep <request_id>`. `LOG_FORMAT=text` gives plain lines for local use.
+- Metrics: every container serves Prometheus text on its internal port 9100 (not published), e.g. `docker compose exec reconciler python -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:9100/metrics').read().decode())"`. A daemon is stuck when `spnc_daemon_last_success_timestamp_seconds` stops advancing.
+
 ## 7. Stop / reset
 ```bash
 docker compose down        # keep data
