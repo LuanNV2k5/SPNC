@@ -1,7 +1,7 @@
 # 36 — SUBMISSION, JUDGING & EXAM LIFECYCLE (PHASE 10) SPECIFICATION
 
 > **Module:** Test Cases, Submission Judging, Exam Lifecycle & Results (Phase 10)
-> **Status:** APPROVED 2026-10-28 (all §9 recommendations; see PROJECT_PROVENANCE_LOG.md) — 10A/10B/10C IMPLEMENTED AND VERIFIED 2026-10-28 (§10); lock tag pending Project Owner review
+> **Status:** APPROVED 2026-10-28 (all §9 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-10-submission-locked`)
 > **Date:** 2026-10-28
 > **Parent Baseline:** `phase-09-observation-locked` (`e0b3315`)
 > **Proposed Branch:** `phase10`
@@ -175,7 +175,7 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before implementation, 
 | 10A checkpoint | `a576fd0` | migration `b8e4f2a91d03` (submission columns, `submission.judged` NOTIFY), `Submission`/`SubmissionSource`, test case CRUD + samples (`app/services/testcase.py`, `app/api/endpoints/testcase.py`), `app/services/judge/grader.py`, per-problem memory limit in sandbox/adapters, `app/repositories/submission.py` (CAS fencing, D5 total). |
 | 10A | `f0443e9` | `app/services/submission.py` (submit transaction, `judge_submission`, `recover_stale_submissions`, D7/D14 student view), `app/api/endpoints/submission.py` (`POST /my/coding-sessions/{id}/submissions`), `app/services/queue.py` (`enqueue_submission`), `app/worker.py` (dispatch by `kind`), `app/reconciler.py` (submission sweep), `SubmissionResponse` (+`exam_id`, `source`, `judge_result`, `result_visible`). |
 | 10B | `5963e17` | migration `c6e2a9d4b710` (exam visibility/cancel columns, `expired_at`, D8 value migration, status CHECKs, scheduler indexes), `app/services/exam_access.py` (D11), `app/services/exam_lifecycle.py` (publish, finalize, teacher/admin cancel, `run_tick`, timeout finalization), `app/api/endpoints/exam_lifecycle.py`, `app/exam_scheduler.py` (`EXAM_SCHEDULER_INTERVAL_SECONDS=30`), D11 in join/start-session/submit, D14 in `result_visible_to_student`, observation reads stored participation state, admin cancel via the service (D13). |
-| 10C | `feat(phase10c): class and exam statistics` | `app/services/statistics.py`, `app/repositories/statistics.py`, `app/schemas/statistics.py`, `app/api/endpoints/statistics.py` (`GET /classes/{id}/statistics`, `GET /exams/{id}/statistics`). |
+| 10C | `460dcdc` | `app/services/statistics.py`, `app/repositories/statistics.py`, `app/schemas/statistics.py`, `app/api/endpoints/statistics.py` (`GET /classes/{id}/statistics`, `GET /exams/{id}/statistics`). |
 
 ### 10.2 10A Behaviour Notes
 - **Submit transaction:** session `FOR UPDATE` → ownership / ACTIVE / snapshot-in-session → exam window (participation IN_PROGRESS, exam not CANCELLED, `start_time ≤ now < end_time`) → ≥1 test case (422 `PROBLEM_HAS_NO_TEST_CASES`) → `Submission` PENDING → `SUBMISSION_CREATED` (seq max+1, `{source:"SERVER", submission_id, code_snapshot_id}`) → `finalize_session(ENDED, STUDENT)` (D2; `SESSION_ENDED` follows at max+1) → one commit → enqueue. A lost enqueue is recovered by the reconciler.

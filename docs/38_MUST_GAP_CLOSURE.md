@@ -1,7 +1,7 @@
 # 38 — MUST REQUIREMENT GAP CLOSURE (PHASE 12) SPECIFICATION
 
 > **Module:** Class invite codes, problem bank completeness and locks, exam edit lock and per-student duration, post-deadline ingest cutoff, run/first-code trace facts (Phase 12)
-> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — 12A/12B/12C IMPLEMENTED AND VERIFIED 2026-10-29 (§8); lock tag pending Project Owner review
+> **Status:** APPROVED 2026-10-29 (all §7 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-12-must-gaps-locked`)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase11` @ `dfa16c6` (Phases 10 and 11 implemented, locks pending)
 > **Proposed Branch:** `phase12`
@@ -127,7 +127,7 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` with DCRs for D4 (Phase
 | Approval | `8ac2904` | PROJECT_PROVENANCE_LOG (spec approval; DCRs SPNC_PROBLEM_LOCK_SCOPE, SPNC_RUN_EXECUTED_RECORD, SPNC_FIRST_CODE_FACT, SPNC_RESERVED_SUBMISSION_EVENT), OPEN_QUESTIONS (OQ-27) |
 | 12A | `b56f527` | migration `d7f3b1c2e845`; `models/class_org.py` (`invite_code`, generator), `models/problem.py` (statement fields, `difficulty`, `deleted_at`); `services/problem_guard.py`; academic service/repo/endpoints (join, rotate, filters, soft delete); `services/testcase.py` (lock via the guard) |
 | 12B | `6aeae89` | migration `e8a4c2d5f901`; `exams.duration_minutes`; `services/exam_access.py` (`participant_deadline`, `assert_participant_open`, `assert_session_writable`); trace/run services (cutoff); academic service (edit lock, duration validation); `services/exam_lifecycle.py` (participant deadline in finalize/timeout, overdue sweep) |
-| 12C | this commit | `services/trace.py` (reserved set, `first_code_at`), `repositories/trace.py` (`mark_first_code`), observation timeline `runs` + `first_code_at`, `SessionResponse.first_code_at` |
+| 12C | `525cc59` | `services/trace.py` (reserved set, `first_code_at`), `repositories/trace.py` (`mark_first_code`), observation timeline `runs` + `first_code_at`, `SessionResponse.first_code_at` |
 
 ### 8.2 Behaviour Notes
 - **Invite codes:** 8 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`; entry is case-insensitive. `ClassResponse` (owner endpoints) carries `invite_code`; `GET /my/classes` uses `StudentClassResponse` without it. Existing classes got codes in the migration. Errors: 404 `INVITE_CODE_INVALID`, 403 `CLASS_NOT_ACTIVE`, 409 `ALREADY_ENROLLED`.
