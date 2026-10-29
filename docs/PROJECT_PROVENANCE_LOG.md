@@ -636,3 +636,19 @@ Locked Baseline:
 | 15A Open-question review fixes | docs/41 | this commit | `phase-15a-oq-review-locked` | 536 + 8 passed (Phase 03–15A), compose E2E 4 |
 
 Pushed to origin with `main` fast-forwarded to this commit.
+
+---
+
+## Decision: Phase 16 CI & Branch Protection Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve all". All recommendations D1–D6 in `docs/42_CI_AND_BRANCH_PROTECTION.md` §6 are approved without overrides.
+
+Approved Decisions (summary):
+D1 GitHub Actions on GitHub-hosted runners; D2 six regression groups in parallel on every push and PR; D3 compose E2E on pushes to `main`, nightly and on demand; D4 `main` protection: PR required, `ci` check required and up to date, no force push or deletion, applies to admins, 0 required approvals; D5 the owner installs and authenticates `gh`, then PRs and protection are handled through it; D6 tech-debt fixes (duplicate `Settings`, Pydantic `class Config`) included.
