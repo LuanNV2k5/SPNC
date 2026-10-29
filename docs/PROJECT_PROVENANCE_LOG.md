@@ -786,3 +786,21 @@ Locked Baseline:
 
 Note:
 Merged after `phase-18-backup-locked` was on `main` (docs/45 D9). The daily purge hook ships disabled (`RETENTION_PURGE_ENABLED=false`); enabling it in a deployment is an operator step (RUNBOOK §10), after a backup.
+
+---
+
+## Decision: Roadmap after Phase 19 (frontend next, go-live gate G1)
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_ROADMAP
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "ok thực hiện 2 cái này trước: Đưa CORS hoặc reverse proxy vào spec của phase frontend. Đặt một mốc cứng: trước khi có người dùng thật đầu tiên, phải xong backup ra ngoài máy chủ và alert tối thiểu." This followed the recommendation to build the frontend next and defer the other operational tasks.
+
+Decisions (recorded in `docs/ROADMAP.md`):
+- The frontend is the next phase. Its specification must decide how the browser reaches the API: CORS with a configured origin list, a same-origin reverse proxy, or both. The backend has no CORS configuration today.
+- Go-live gate G1 (hard): before the first real user, G1.1 an encrypted off-host backup copy with one verified restore from it, and G1.2 minimal alerting (backup failed or stale, daemon stale, `/ready` failing, judge backlog, disk usage). Each is done through its own locked phase. Until then deployments hold only test or demo data.
+- Deferred, no fixed order: load test (after the frontend), compose `api` healthcheck, the docs/43 deferred metrics, dashboards, enabling the daily retention purge, trace partitioning, trace export and audit-log expiry.
