@@ -47,6 +47,7 @@ def _session_item(s: CodingSession, d: dict) -> dict:
         "signal_count": d["signal_count"],
         "final_loc": s.final_loc,
         "working_time_seconds": s.working_time_seconds,
+        "trace_purged_at": s.trace_purged_at,
     }
 
 

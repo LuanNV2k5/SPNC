@@ -41,6 +41,12 @@ ORPHANS_DETECTED = Counter("snapshot_orphan_detected_total", "Unreferenced snaps
 ORPHANS_CLEANED = Counter("snapshot_orphan_cleanup_total", "Orphan snapshot blobs deleted")
 ORPHAN_CLEANUP_FAILURES = Counter("snapshot_orphan_cleanup_failure_total", "Orphan sweep or delete failures")
 
+# -- Retention purge (docs/45 §3.7) ----------------------------------------------
+RETENTION_ROWS = Counter("retention_purge_rows_total", "Rows deleted by the retention purge", ["data_class"])
+RETENTION_SESSIONS = Counter("retention_purge_sessions_total", "Sessions handled by the retention purge", ["outcome"])
+RETENTION_BLOB_DELETES = Counter("retention_purge_blob_delete_total", "Snapshot blob deletes after a purge", ["outcome"])
+RETENTION_ELIGIBLE = Gauge("retention_purge_eligible_sessions", "Sessions eligible for purge at the last run")
+
 # -- Realtime (docs/07 §4.4) -----------------------------------------------------
 WS_ACTIVE = Gauge("websocket_active_connections", "Authenticated teacher WebSocket connections")
 WS_AUTH_REJECTIONS = Counter("websocket_auth_rejection_total", "WebSocket connections closed during auth", ["reason"])

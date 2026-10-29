@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import String, Boolean, ForeignKey, Integer, UniqueConstraint, CheckConstraint, DateTime
+from sqlalchemy import String, Boolean, ForeignKey, Integer, UniqueConstraint, CheckConstraint, DateTime, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -44,6 +44,8 @@ class CodingSession(Base, TimestampMixin):
     working_time_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # REQ-USER-007, docs/39 D3: idle threshold in force when the session opened (NULL = deployment default)
     idle_threshold_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # docs/45 §3.2: set when the retention purge removed this session's raw trace
+    trace_purged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     final_code_snapshot_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("code_snapshots.id", ondelete="RESTRICT", name="fk_coding_sessions_final_code_snapshot_id", use_alter=True), nullable=True)
 
     student: Mapped["User"] = relationship("User")
@@ -63,6 +65,7 @@ class CodingSession(Base, TimestampMixin):
         ),
         CheckConstraint('final_loc >= 0', name='ck_coding_sessions_final_loc_non_negative'),
         CheckConstraint('working_time_seconds >= 0', name='ck_coding_sessions_working_time_non_negative'),
+        Index('ix_coding_sessions_purge_candidates', 'ended_at', postgresql_where=text('trace_purged_at IS NULL')),
     )
 
 class PracticeAttempt(Base, TimestampMixin):

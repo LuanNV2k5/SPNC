@@ -146,3 +146,14 @@ Data written after the set was taken (at most 24 h) is lost; clients retry trace
 PYTHON=apps/api/venv/Scripts/python deploy/backup/drill.sh     # Linux/macOS: PYTHON=python3
 ```
 On its own compose project (`spnc-drill`, API port 8018, console 9018; never the demo stack): starts a stack, seeds data (compose E2E + a drill teacher/class/submission), backs up, destroys every volume, restores into an empty stack, verifies, reads the seeded snapshot back through the teacher API, re-judges it, runs the compose E2E again and prints the restore time. CI runs it nightly and on demand (`backup-drill` job). Run it after any change to the schema or to the backup tool.
+
+## 10. Retention purge (docs/45)
+Raw trace (trace events, scratchpad revisions, checkpoint snapshots that no run, submission or final code uses, and their blobs) of sessions that ended more than `retention_days` ago is deleted; sessions, runs, submissions, scores, signals and audit logs stay. `retention_days` is the admin setting (`PATCH /api/v1/admin/settings`), 180 when unset, never below `RETENTION_MIN_DAYS` (30). Refresh tokens expired more than 7 days are removed too.
+```bash
+docker compose exec api python -m app.cli retention-purge             # dry run: counts only
+docker compose exec api python -m app.cli retention-purge --apply     # delete (bounded: RETENTION_PURGE_MAX_BATCHES)
+```
+- Run a backup (§9.2) before the first `--apply`. Each applied batch writes an audit row `RETENTION_PURGE` with the session ids.
+- Daily automatic purge: set `RETENTION_PURGE_ENABLED=true` for the `reconciler` (off by default); metrics `retention_purge_*` on its port 9100.
+- Exam under dispute: `PUT /api/v1/admin/exams/{id}/retention-hold` with `{"hold": true, "reason": "…"}` keeps its sessions out of the purge until released.
+- After a restore (§9.4) from a set older than a purge, the purged rows come back: run the purge again.

@@ -749,3 +749,19 @@ Locked Baseline:
 
 Note:
 The local regression now honours `PG_BASE` for every test file (docs/44 §8.2), so all groups, auth/academic/judge included, can be verified locally off the shared container. This closes the follow-up recorded in the Phase 17 lock entry.
+
+---
+
+## Decision: Phase 19 Retention Purge Specification Approval
+
+Date:
+2026-10-29
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Approve all" (reply to "Approve all recommendations D1–D9 in docs/45?"). All recommendations D1–D9 in `docs/45_RETENTION_PURGE.md` §6 are approved without overrides.
+
+Approved Decisions (summary):
+D1 purge raw trace only (trace events, scratchpad revisions, checkpoint snapshots no run/submission/final code references, and their blobs) after `retention_days`, plus refresh tokens expired more than 7 days; academic records and audit logs kept; D2 hard delete, session row kept with `trace_purged_at`; D3 one service used by a CLI (`retention-purge`, dry run by default, `--apply`) and a reconciler hook off by default (`RETENTION_PURGE_ENABLED=false`), daily, bounded batches, `SKIP LOCKED` + advisory lock; D4 exclusions of docs/45 §3.1 plus `exams.retention_hold` set by ADMIN via `PUT /api/v1/admin/exams/{id}/retention-hold` (audited); D5 one `RETENTION_PURGE` audit row per applied batch; D6 rows deleted and committed before blobs, only unreferenced blobs deleted, failures left to the orphan sweep; D7 reuse admin `retention_days`, unset default 30 → 180, floor `RETENTION_MIN_DAYS=30`; D8 purge metrics in `app/core/metrics.py`; D9 merge only after Phase 18 is locked on `main`.

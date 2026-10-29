@@ -52,6 +52,11 @@ class AdminExamDetailResponse(BaseModel):
     status: str
     start_time: datetime
     end_time: datetime
+    retention_hold: bool = False   # docs/45 D4
+
+class AdminRetentionHoldRequest(BaseModel):
+    hold: bool
+    reason: str = Field(..., min_length=1, max_length=500)
 
 class AdminExamListResponse(BaseModel):
     items: List[AdminExamDetailResponse]
