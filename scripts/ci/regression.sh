@@ -127,6 +127,10 @@ while read -r file db; do
   TOTAL_PASSED=$((TOTAL_PASSED + ${passed:-0}))
   if [ $rc -ne 0 ]; then
     FAILED=$((FAILED + 1))
+    # Failing test ids as annotations: readable on the run page without downloading logs
+    echo "$out" | grep -E '^(FAILED|ERROR) ' | sed 's/ - .*//' | head -20 | while read -r kind id; do
+      echo "::error title=$kind in $file::$id"
+    done
     echo "::group::FAILED $file"
     echo "$out" | tail -60
     echo "::endgroup::"
