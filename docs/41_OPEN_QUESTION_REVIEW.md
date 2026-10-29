@@ -1,7 +1,7 @@
 # 41 — REVIEW OF THE REMAINING OPEN QUESTIONS (STEP 0)
 
 > **Scope:** OQ-01 to OQ-13, OQ-15, OQ-23, OQ-24 (16 questions still OPEN after Phase 14)
-> **Status:** APPROVED 2026-10-29 (R1–R10 as recommended; see PROJECT_PROVENANCE_LOG.md) — Phase 15A IMPLEMENTED AND VERIFIED 2026-10-29 (§5); lock tag pending Project Owner review
+> **Status:** APPROVED 2026-10-29 (R1–R10 as recommended; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-29 (`phase-15a-oq-review-locked`)
 > **Date:** 2026-10-29
 > **Baseline:** `main` = `phase-14-open-questions-locked` (`2f7a71f`)
 > **Proposed Branch:** `phase15`

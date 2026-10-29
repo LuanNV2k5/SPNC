@@ -616,3 +616,23 @@ Decisions:
 
 Consequence:
 No OPEN question remains. R1–R5 and the R7 rename are implemented as Phase 15A.
+
+---
+
+## Decision: Phase 15A Lock
+
+Date:
+2026-10-29
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Lock + push".
+
+Locked Baseline:
+| Phase | Spec | Lock commit | Tag | Verification |
+|---|---|---|---|---|
+| 15A Open-question review fixes | docs/41 | this commit | `phase-15a-oq-review-locked` | 536 + 8 passed (Phase 03–15A), compose E2E 4 |
+
+Pushed to origin with `main` fast-forwarded to this commit.
