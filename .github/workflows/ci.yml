@@ -1,0 +1,148 @@
+# SPNC continuous integration (docs/42). No secrets: every credential here is disposable.
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 19 * * *"   # nightly compose E2E (02:00 Asia/Ho_Chi_Minh)
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.14"
+  PG_BASE: postgresql://spnc_test:spnc_test_password@localhost:5432
+  MINIO_IMAGE: cgr.dev/chainguard/minio@sha256:e70b2b1e74d79457f808710483bd726ff364529ca30736eaa15a6ab547d3a5a7
+
+jobs:
+  tests:
+    name: tests (${{ matrix.group }})
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [auth, academic, judge, signals, observation, phase10plus]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: spnc_test
+          POSTGRES_PASSWORD: spnc_test_password
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U spnc_test" --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r apps/api/requirements.txt
+
+      - name: Start MinIO for storage tests
+        if: matrix.group == 'phase10plus'
+        run: |
+          docker run -d --name spnc-minio-test -p 127.0.0.1:19000:9000 \
+            -e MINIO_ROOT_USER=spnc-test -e MINIO_ROOT_PASSWORD=spnc-test-password \
+            --tmpfs /data:uid=65532,gid=65532 "$MINIO_IMAGE" server /data
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:19000/minio/health/ready && break; sleep 1; done
+
+      - name: Pull sandbox images
+        if: matrix.group == 'judge'
+        run: |
+          docker pull python:3.10-slim
+          docker pull gcc:12
+
+      - name: Regression (${{ matrix.group }})
+        env:
+          PYTHON: python
+        run: bash scripts/ci/regression.sh ${{ matrix.group }}
+
+  # Single required status check for branch protection (docs/42 D4)
+  ci:
+    if: always() && github.event_name != 'schedule'
+    needs: tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: All regression groups passed
+        run: |
+          echo "tests result: ${{ needs.tests.result }}"
+          test "${{ needs.tests.result }}" = "success"
+
+  compose-e2e:
+    name: compose E2E
+    if: >-
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate disposable .env
+        run: |
+          r() { openssl rand -hex 16; }
+          {
+            echo "POSTGRES_USER=spnc"; echo "POSTGRES_PASSWORD=$(r)"; echo "POSTGRES_DB=spnc"
+            echo "MINIO_ROOT_USER=spnc-minio"; echo "MINIO_ROOT_PASSWORD=$(r)"; echo "S3_BUCKET=spnc-snapshots"
+            echo "SECRET_KEY=$(r)$(r)"; echo "SPNC_BOOTSTRAP_ADMIN_PASSWORD=$(r)"; echo "API_PORT=8000"
+          } > .env
+
+      - name: Pull sandbox images
+        run: |
+          docker pull python:3.10-slim
+          docker pull gcc:12
+
+      - name: Start the stack
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 60); do curl -fs http://127.0.0.1:8000/docs > /dev/null && break; sleep 2; done
+          docker compose ps
+
+      - name: Bootstrap admin
+        run: docker compose exec -T api python -m app.cli create-admin --username admin --email admin@example.org
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Install test dependencies
+        run: pip install -r apps/api/requirements.txt
+
+      - name: End-to-end tests
+        working-directory: apps/api
+        run: |
+          set -a; . ../../.env; set +a
+          SPNC_E2E_BASE_URL=http://127.0.0.1:8000 SPNC_E2E_ADMIN_USER=admin \
+          SPNC_E2E_ADMIN_PASSWORD="$SPNC_BOOTSTRAP_ADMIN_PASSWORD" SPNC_E2E_ADMIN_NEW_PASSWORD="E2e-$POSTGRES_PASSWORD" \
+          DATABASE_URL=postgresql://unused:unused@localhost/unused \
+          python -m pytest tests/e2e/test_compose_stack.py -q -p no:warnings
+
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose logs --tail 200 api worker
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
