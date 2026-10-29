@@ -173,7 +173,7 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 | `09fb721` | Spec approval (PROJECT_PROVENANCE_LOG) |
 | `ce303c1` | `apps/web` scaffold (exact pins, ESLint rule for `src/trace`), `scripts/web/dump_openapi.py`, committed `openapi.json` + `src/api/schema.d.ts`, trace module (`recorder`, IndexedDB `store`, `payloads`, `backoff`, `lock`) with Vitest tests |
 | `e356c65` | API client (`X-Request-ID`, 401 → refresh → one retry), cross-tab single-flight refresh (Web Locks), error display, Vietnamese strings, routing and guards, login, forced password change, practice list, problem page, Monaco workspace (trace capture, checkpoint, run, submit, end, resume per D10) |
-| _(next commit)_ | `apps/web/Dockerfile` + `nginx.conf`, compose service `web`, `WEB_PORT` in `.env.example`; CI job `web` and `ci needs: [tests, web]`; Playwright step in `compose-e2e`; client contract fixture + `tests/api/test_phase20a_trace_contract.py` (group `phase10plus`); Playwright tests; RUNBOOK §11; `apps/web/README.md` |
+| `faa952e` | `apps/web/Dockerfile` + `nginx.conf`, compose service `web`, `WEB_PORT` in `.env.example`; CI job `web` and `ci needs: [tests, web]`; Playwright step in `compose-e2e`; client contract fixture + `tests/api/test_phase20a_trace_contract.py` (group `phase10plus`); Playwright tests; RUNBOOK §11; `apps/web/README.md` |
 
 ### 7.2 Implementation Notes (within the approved decisions)
 - **Versions.** The newest release of each major line that is known to work together: React 19.3.1, React Router 7.18.5, TanStack Query 5.105.0, Mantine 8.3.18, Vite 7.3.7, Vitest 4.1.12 (3.x has audit findings in `@vitest/mocker`/`tinypool`), TypeScript 5.9.3 (`openapi-typescript` 7 requires TypeScript 5), ESLint 10.13.0, `monaco-editor` 0.52.2, `openapi-fetch` 0.17.0, `openapi-typescript` 7.13.0, Playwright 1.64.1. `npm audit`: 0 vulnerabilities. CI uses Node 22.
@@ -191,4 +191,12 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 ### 7.3 Verification
 | Check | Environment | Result |
 |---|---|---|
-| | | |
+| AC-20A-06 Vitest (trace recorder, store, payloads, contract fixture, auth refresh single-flight, error mapping) | this machine, Node 24, jsdom + `fake-indexeddb` | **28 passed** |
+| Lint, typecheck, production build | same | clean; build OK |
+| AC-20A-10 generated client up to date | `dump_openapi.py` (FastAPI 0.141.1 = `requirements.txt`) + `npm run gen:api` | no diff |
+| AC-20A-09 `test_phase20a_trace_contract.py` | own PostgreSQL 16 on port 55435 | **2 passed** |
+| Full local regression `regression.sh all` | same, every group isolated | **595 passed, 0 failed** (48 files; 593 before this phase + 2) |
+| AC-20A-11 production image through `web` | separate compose project `spnc20a` (ports 18000/18080/19001; demo stack `phase11` untouched) | SPA route reload 200 with CSP, `nosniff`; `/api/v1/auth/me` 401 with the client `X-Request-ID` echoed; WebSocket upgrade 101; `/docs`, `/openapi.json`, `/health`, `/ready`, `/metrics` return only the SPA shell |
+| AC-20A-02/04/05/07/08/12 Playwright (4 tests) | same stack, Chromium | **4 passed**: forced password change and reload; teacher placeholder and `FORBIDDEN_ROLE` with request id; full practice session (checkpoint, run, submit ACCEPTED), server trace contiguous `1..N` with every event type, replay = submitted snapshot exactly; ingest failure + reload: no gap, no duplicate, replay = run snapshot exactly |
+| AC-20A-03 two tabs | unit tests (serializing lock stand-in) | one rotation per tab burst; each rotation uses the newest stored token; not exercised with two real browser tabs |
+| AC-20A-12 CI | GitHub Actions on the PR | _pending_ |
