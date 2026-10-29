@@ -652,3 +652,26 @@ Project Owner explicit authorization (2026-10-29): "Approve all". All recommenda
 
 Approved Decisions (summary):
 D1 GitHub Actions on GitHub-hosted runners; D2 six regression groups in parallel on every push and PR; D3 compose E2E on pushes to `main`, nightly and on demand; D4 `main` protection: PR required, `ci` check required and up to date, no force push or deletion, applies to admins, 0 required approvals; D5 the owner installs and authenticates `gh`, then PRs and protection are handled through it; D6 tech-debt fixes (duplicate `Settings`, Pydantic `class Config`) included.
+
+---
+
+## Decision: Phase 16 Lock
+
+Date:
+2026-10-29
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-29): "Lock Phase 16".
+
+Locked Baseline:
+| Phase | Spec | Merged via | Tag | Verification |
+|---|---|---|---|---|
+| 16 CI & branch protection | docs/42 | PR #1 (`e5178bf`), PR #2 (record + this lock commit) | `phase-16-ci-locked` on the merge commit of PR #2 | local `regression.sh all` 538 passed; GitHub Actions all groups + compose E2E green on `main`; direct push to `main` rejected |
+
+Correction:
+The Phase 15A baseline is 536 passed (the "536 + 8" in the Phase 15A lock entry counted the re-run file twice); see docs/42 §7.3.
+
+First phase locked under branch protection: the lock commit reached `main` through a pull request with `ci` green.
