@@ -66,6 +66,9 @@ class PointTransaction(Base):
     amount: Mapped[int] = mapped_column(Integer) # Can be negative
     reason: Mapped[str] = mapped_column(String(255))
     source_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Phase 14 (OQ-16): practice award links; UNIQUE(student, problem) WHERE reason = PRACTICE_ACCEPTED
+    problem_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("problems.id", ondelete="RESTRICT", name="fk_point_transactions_problem_id"), nullable=True)
+    submission_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("submissions.id", ondelete="RESTRICT", name="fk_point_transactions_submission_id"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 

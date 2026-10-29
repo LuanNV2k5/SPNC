@@ -23,6 +23,7 @@ from app.repositories import submission as submission_repo
 from app.repositories import trace as trace_repo
 from app.services.exam_access import assert_participant_open
 from app.services.judge.grader import grade
+from app.services.points import award_for_submission
 from app.services.queue import judge_queue
 from app.services.session_lifecycle import finalize_session
 from app.services.storage import StorageUnavailable, storage_adapter
@@ -194,6 +195,9 @@ def judge_submission(db: Session, submission_id: uuid.UUID, adapters: Optional[M
         return False
     if submission.exam_id:
         submission_repo.recompute_exam_total(db, submission.exam_id, submission.student_id)
+    elif status == RunStatus.COMPLETED:
+        # Phase 14 (OQ-16): practice points, same transaction as the fenced write
+        award_for_submission(db, submission, outcome["verdict"].value)
     db.commit()
     return True
 
