@@ -1,0 +1,95 @@
+{
+  "events": [
+    {
+      "sequence_number": 1,
+      "event_type": "PROBLEM_OPENED",
+      "client_timestamp": "2026-10-30T08:00:00.000Z",
+      "payload": {
+        "problem_id": "{{PROBLEM_ID}}",
+        "language": "PYTHON3"
+      }
+    },
+    {
+      "sequence_number": 2,
+      "event_type": "EDITOR_CHANGED",
+      "client_timestamp": "2026-10-30T08:00:01.000Z",
+      "payload": {
+        "operation_type": "INSERT",
+        "range_offset": 0,
+        "range_length": 0,
+        "text": "print(1)",
+        "editor_version": "2",
+        "input_source": "typing"
+      }
+    },
+    {
+      "sequence_number": 3,
+      "event_type": "EDITOR_CHANGED",
+      "client_timestamp": "2026-10-30T08:00:02.000Z",
+      "payload": {
+        "operation_type": "REPLACE",
+        "range_offset": 6,
+        "range_length": 1,
+        "text": "40 + 2",
+        "editor_version": "3",
+        "input_source": "paste"
+      }
+    },
+    {
+      "sequence_number": 4,
+      "event_type": "EDITOR_CHANGED",
+      "client_timestamp": "2026-10-30T08:00:03.000Z",
+      "payload": {
+        "operation_type": "DELETE",
+        "range_offset": 12,
+        "range_length": 1,
+        "text": "",
+        "editor_version": "4",
+        "input_source": "other"
+      }
+    },
+    {
+      "sequence_number": 5,
+      "event_type": "EDITOR_CHANGED",
+      "client_timestamp": "2026-10-30T08:00:04.000Z",
+      "payload": {
+        "operation_type": "INSERT",
+        "range_offset": 0,
+        "range_length": 0,
+        "text": "\n",
+        "editor_version": "4",
+        "input_source": "other"
+      }
+    },
+    {
+      "sequence_number": 6,
+      "event_type": "SESSION_CHECKPOINT",
+      "client_timestamp": "2026-10-30T08:00:05.000Z",
+      "payload": {
+        "code_snapshot_id": "{{CHECKPOINT_SNAPSHOT_ID}}"
+      }
+    },
+    {
+      "sequence_number": 7,
+      "event_type": "RUN_REQUESTED",
+      "client_timestamp": "2026-10-30T08:00:06.000Z",
+      "payload": {
+        "code_snapshot_id": "{{RUN_SNAPSHOT_ID}}",
+        "run_id": "{{RUN_ID}}",
+        "input_used": "1 2\n"
+      }
+    },
+    {
+      "sequence_number": 8,
+      "event_type": "RUN_COMPLETED",
+      "client_timestamp": "2026-10-30T08:00:07.000Z",
+      "payload": {
+        "run_id": "{{RUN_ID}}",
+        "code_snapshot_id": "{{RUN_SNAPSHOT_ID}}",
+        "status": "COMPLETED",
+        "verdict": "ACCEPTED",
+        "execution_time_ms": 12
+      }
+    }
+  ]
+}

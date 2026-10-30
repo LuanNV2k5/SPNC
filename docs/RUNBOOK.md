@@ -1,7 +1,7 @@
 # RUNBOOK — SPNC demo / development stack
 
 > Phase 11 (docs/37). Docker Compose stack: PostgreSQL 16, Redis 7, MinIO, API, judge worker,
-> reconciler, signal scheduler, exam scheduler. Backend only (no frontend yet).
+> reconciler, signal scheduler, exam scheduler, and the web client (`web`, Phase 20A, docs/46).
 >
 > **Not for production.** The judge worker mounts the host Docker socket (docs/37 D3), which
 > gives it host-root-equivalent access. For production, run the judge on a dedicated host as
@@ -157,3 +157,19 @@ docker compose exec api python -m app.cli retention-purge --apply     # delete (
 - Daily automatic purge: set `RETENTION_PURGE_ENABLED=true` for the `reconciler` (off by default); metrics `retention_purge_*` on its port 9100.
 - Exam under dispute: `PUT /api/v1/admin/exams/{id}/retention-hold` with `{"hold": true, "reason": "…"}` keeps its sessions out of the purge until released.
 - After a restore (§9.4) from a set older than a purge, the purged rows come back: run the purge again.
+
+## 11. Web client (docs/46)
+- **In the stack:** the `web` service serves the built SPA and proxies `/api/` (REST and the WebSocket) to `api`, so the browser uses one origin and no CORS is needed. Open `http://127.0.0.1:${WEB_PORT:-8080}`. `/docs`, `/health`, `/ready` and the metrics port are not reachable through it; use the API port for them.
+- **Development:** from `apps/web`, `npm ci` once, then `npm run dev` (Vite on `http://127.0.0.1:5173`, proxying `/api` to `SPNC_API_TARGET`, default `http://127.0.0.1:8000`).
+- **Checks:** `npm run lint`, `npm run typecheck`, `npm test` (Vitest, trace module), `npm run build`.
+- **API client:** after any backend API change, regenerate and commit both files, or the CI `web` job fails:
+  ```bash
+  python scripts/web/dump_openapi.py
+  ```
+  then `npm run gen:api` in `apps/web`.
+- **Browser E2E** (Playwright, with the stack running and the admin bootstrapped, §4): from `apps/web`, `npx playwright install chromium` once, then
+  ```bash
+  SPNC_WEB_URL=http://127.0.0.1:8080 SPNC_E2E_ADMIN_USER=admin SPNC_E2E_ADMIN_PASSWORD='<bootstrap password>' SPNC_E2E_ADMIN_NEW_PASSWORD='<new admin password>' npx playwright test
+  ```
+  It creates its own teacher, student and problem. One test waits about a minute for a checkpoint.
+- **Browser storage:** unsent trace events and the editor draft of each open session are kept in the browser's IndexedDB (`spnc-trace`) until the server confirms them; logging out deletes them for that user. A trace-status badge above the editor shows unsent events.
