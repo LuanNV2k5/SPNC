@@ -225,7 +225,7 @@ jobs:
 
       - name: Stack logs on failure
         if: failure()
-        run: docker compose logs --tail 200 api worker
+        run: docker compose logs --tail 200 api worker signal-scheduler reconciler
 
       - name: Tear down
         if: always()
