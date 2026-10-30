@@ -47,7 +47,7 @@ Only `DRAFT` exams can be configured. Publishing remains available only for draf
 | `npm test -- --run` | PASS — 43 tests in 9 files |
 | `npm run build` | PASS; existing Monaco bundle-size warning remains |
 | `git diff --check` | PASS |
-| Playwright AC-21A-01 | Added; not run locally because Docker Desktop's Linux engine was unavailable |
+| Playwright AC-21A-01 | First Compose run reached the class picker, then exposed an ambiguous test locator (input and listbox both matched); selector corrected, rerun pending |
 | Desktop/mobile visual review | Pending; requires a running app/API stack |
 | CI / PR / merge / lock tag | Pending |
 

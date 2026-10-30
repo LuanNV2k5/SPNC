@@ -33,12 +33,12 @@ test("AC-21A-01: teacher creates, configures and publishes an exam, then observe
   await expect(page).toHaveURL(/\/teacher\/exams\/[0-9a-f-]+$/);
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
-  await page.getByLabel("Chọn lớp").click();
+  await page.getByRole("textbox", { name: "Chọn lớp" }).click();
   await page.getByRole("option", { name: /PW ·/ }).click();
   await page.getByRole("button", { name: "Gắn lớp" }).click();
   await expect(page.getByText("PW", { exact: true })).toBeVisible();
 
-  await page.getByLabel("Đề bài").click();
+  await page.getByRole("textbox", { name: "Đề bài" }).click();
   await page.getByRole("option", { name: problemTitle }).click();
   await page.getByLabel("Điểm").fill("50");
   await page.getByRole("button", { name: "Thêm đề" }).click();
