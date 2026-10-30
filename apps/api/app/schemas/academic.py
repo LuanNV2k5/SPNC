@@ -203,6 +203,11 @@ class PublicationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PublicationListResponse(BaseModel):
+    items: List[PublicationResponse]
+    total: int
+
+
 # ---------------------------------------------------------------------------
 # Exam
 # ---------------------------------------------------------------------------

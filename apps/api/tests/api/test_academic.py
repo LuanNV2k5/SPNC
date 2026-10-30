@@ -566,6 +566,47 @@ class TestProblemManagement:
         r3 = client.get(f"/api/v1/problems/{pid}", headers=_auth(tok_s))
         assert r3.status_code == 403
 
+    def test_P20C_P01_owner_lists_problem_publications(self, db_session):
+        """Teacher authoring UI can restore publication state without exposing it cross-teacher."""
+        _make_user(db_session, "teacher_p20c_owner", "TEACHER")
+        _make_user(db_session, "teacher_p20c_other", "TEACHER")
+        owner_token = _login("teacher_p20c_owner")
+        other_token = _login("teacher_p20c_other")
+
+        class_ids = []
+        for name in ("Published class", "Unpublished class"):
+            response = client.post(
+                "/api/v1/classes",
+                json={"name": name, "academic_year": "2026"},
+                headers=_auth(owner_token),
+            )
+            assert response.status_code == 201
+            class_ids.append(response.json()["id"])
+
+        problem = self._create_problem(owner_token, "Publication state", "CLASS")
+        problem_id = problem.json()["id"]
+        published = client.post(
+            f"/api/v1/problems/{problem_id}/publish",
+            json={"class_id": class_ids[0]},
+            headers=_auth(owner_token),
+        )
+        assert published.status_code == 201
+
+        listed = client.get(
+            f"/api/v1/problems/{problem_id}/publications",
+            headers=_auth(owner_token),
+        )
+        assert listed.status_code == 200
+        assert listed.json()["total"] == 1
+        assert [item["class_id"] for item in listed.json()["items"]] == [class_ids[0]]
+
+        forbidden = client.get(
+            f"/api/v1/problems/{problem_id}/publications",
+            headers=_auth(other_token),
+        )
+        assert forbidden.status_code == 403
+        assert forbidden.json()["error_code"] == "PROBLEM_FORBIDDEN"
+
     def test_P05_P13_public_problem_teacher_cannot_edit_others(self, db_session):
         """P05-P13: PUBLIC problem still belongs to owner; another teacher cannot edit."""
         t1 = _make_user(db_session, "teacher_p13a", "TEACHER")

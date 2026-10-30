@@ -1,9 +1,10 @@
-import { Badge, Button, Code, CopyButton, Group, Loader, Stack, Table, Tabs, Text, Title } from "@mantine/core";
+import { Badge, Box, Button, Center, Code, CopyButton, Group, Loader, Paper, Stack, Table, Tabs, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link, useParams } from "react-router";
 import { tt } from "../../i18n/vi";
 import { ErrorAlert } from "../../ui/ErrorAlert";
+import { PageHeader } from "../../ui/PageHeader";
 import { LiveBadge } from "./LiveBadge";
 import { useLive } from "./LiveProvider";
 import { getClass, keys, listAttention, listMembers, rotateInvite } from "./teacherApi";
@@ -28,20 +29,16 @@ export function ClassPage() {
   });
   const studentLink = (studentId: string) => `/teacher/classes/${classId}/students/${studentId}`;
 
-  if (klass.isPending) return <Loader />;
+  if (klass.isPending) return <Center py={80}><Loader /></Center>;
   if (!klass.data) return <ErrorAlert error={klass.error} />;
 
   return (
-    <Stack>
-      <Group justify="space-between">
-        <Title order={3}>
-          {klass.data.name} <Text span c="dimmed">({klass.data.academic_year})</Text>
-        </Title>
-        <LiveBadge />
-      </Group>
-      <Group gap="xs">
-        <Text size="sm">{tt.classes.inviteCode}:</Text>
-        <Code data-testid="invite-code">{klass.data.invite_code}</Code>
+    <Stack gap="xl">
+      <PageHeader eyebrow="Chi tiết lớp học" title={klass.data.name} description={`Năm học ${klass.data.academic_year} · Theo dõi học sinh cần hỗ trợ theo thời gian thực.`} action={<LiveBadge />} />
+      <Paper className="surface-card" p="lg">
+      <Group gap="sm" justify="space-between">
+        <Box><Text size="xs" c="dimmed" fw={650} tt="uppercase">{tt.classes.inviteCode}</Text><Code fz="lg" fw={700} mt={5} data-testid="invite-code">{klass.data.invite_code}</Code></Box>
+        <Group gap="xs">
         <CopyButton value={klass.data.invite_code}>
           {({ copied, copy }) => (
             <Button size="compact-xs" variant="subtle" onClick={copy}>
@@ -52,20 +49,23 @@ export function ClassPage() {
         <Button size="compact-xs" variant="subtle" color="orange" loading={rotate.isPending} onClick={() => window.confirm(tt.classes.rotateConfirm) && rotate.mutate()}>
           {tt.classes.rotate}
         </Button>
+        </Group>
       </Group>
+      </Paper>
       <ErrorAlert error={rotate.error} />
-      <Tabs defaultValue="attention">
+      <Tabs defaultValue="attention" className="editor-tabs">
         <Tabs.List>
           <Tabs.Tab value="attention">
             {tt.klass.attention} {attention.data && attention.data.total > 0 && <Badge size="sm" ml={4}>{attention.data.total}</Badge>}
           </Tabs.Tab>
           <Tabs.Tab value="roster">{tt.klass.roster}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="attention" pt="sm">
+        <Tabs.Panel value="attention" pt="xl">
+          <Paper className="table-card" p={attention.data?.items.length === 0 ? "xl" : 0}>
           <ErrorAlert error={attention.error} />
-          {attention.data && attention.data.items.length === 0 && <Text c="dimmed">{tt.klass.noAttention}</Text>}
+          {attention.data && attention.data.items.length === 0 && <Center py="xl"><Stack align="center" gap={5}><Text fz={30}>✓</Text><Text fw={700}>{tt.klass.noAttention}</Text><Text size="sm" c="dimmed">Không có tín hiệu mới cần xử lý.</Text></Stack></Center>}
           {attention.data && attention.data.items.length > 0 && (
-            <Table data-testid="attention-table">
+            <Table.ScrollContainer minWidth={720}><Table data-testid="attention-table" verticalSpacing="md" horizontalSpacing="lg" highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>{tt.klass.fullName}</Table.Th>
@@ -98,14 +98,16 @@ export function ClassPage() {
                   </Table.Tr>
                 ))}
               </Table.Tbody>
-            </Table>
+            </Table></Table.ScrollContainer>
           )}
+          </Paper>
         </Tabs.Panel>
-        <Tabs.Panel value="roster" pt="sm">
+        <Tabs.Panel value="roster" pt="xl">
+          <Paper className="table-card" p={members.data?.items.length === 0 ? "xl" : 0}>
           <ErrorAlert error={members.error} />
           {members.data && members.data.items.length === 0 && <Text c="dimmed">{tt.klass.noMembers}</Text>}
           {members.data && members.data.items.length > 0 && (
-            <Table data-testid="roster-table">
+            <Table.ScrollContainer minWidth={650}><Table data-testid="roster-table" verticalSpacing="md" horizontalSpacing="lg" highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>{tt.klass.fullName}</Table.Th>
@@ -128,8 +130,9 @@ export function ClassPage() {
                   </Table.Tr>
                 ))}
               </Table.Tbody>
-            </Table>
+            </Table></Table.ScrollContainer>
           )}
+          </Paper>
         </Tabs.Panel>
       </Tabs>
     </Stack>

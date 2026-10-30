@@ -2504,6 +2504,27 @@
         "title": "ProblemUpdateRequest",
         "type": "object"
       },
+      "PublicationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PublicationListResponse",
+        "type": "object"
+      },
       "PublicationResponse": {
         "properties": {
           "class_id": {
@@ -9473,6 +9494,55 @@
           }
         ],
         "summary": "[P05-P04] Update problem (Teacher owner only)",
+        "tags": [
+          "academic",
+          "problems"
+        ]
+      }
+    },
+    "/api/v1/problems/{problem_id}/publications": {
+      "get": {
+        "operationId": "list_problem_publications_api_v1_problems__problem_id__publications_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "problem_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Problem Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "[P20C-P01] List classes a problem is published to (Teacher owner only)",
         "tags": [
           "academic",
           "problems"

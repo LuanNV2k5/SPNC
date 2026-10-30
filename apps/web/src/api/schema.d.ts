@@ -1272,6 +1272,23 @@ export interface paths {
         patch: operations["update_problem_api_v1_problems__problem_id__patch"];
         trace?: never;
     };
+    "/api/v1/problems/{problem_id}/publications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** [P20C-P01] List classes a problem is published to (Teacher owner only) */
+        get: operations["list_problem_publications_api_v1_problems__problem_id__publications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/problems/{problem_id}/publish": {
         parameters: {
             query?: never;
@@ -2386,6 +2403,13 @@ export interface components {
             title?: string | null;
             /** Visibility */
             visibility?: string | null;
+        };
+        /** PublicationListResponse */
+        PublicationListResponse: {
+            /** Items */
+            items: components["schemas"]["PublicationResponse"][];
+            /** Total */
+            total: number;
         };
         /** PublicationResponse */
         PublicationResponse: {
@@ -6089,6 +6113,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_problem_publications_api_v1_problems__problem_id__publications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                problem_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationListResponse"];
                 };
             };
             /** @description Validation Error */

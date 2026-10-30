@@ -1,10 +1,11 @@
-import { Badge, Button, Group, Loader, Pagination, Select, Stack, Table, Text, Title } from "@mantine/core";
+import { Badge, Box, Button, Center, Group, Loader, Pagination, Paper, Select, SimpleGrid, Stack, Table, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 import { api, call } from "../../api/client";
 import { difficultyLabel, languageLabel, t } from "../../i18n/vi";
 import { ErrorAlert } from "../../ui/ErrorAlert";
+import { PageHeader } from "../../ui/PageHeader";
 
 const PAGE_SIZE = 20;
 type Difficulty = "EASY" | "MEDIUM" | "HARD";
@@ -25,9 +26,11 @@ export function ProblemListPage() {
   });
 
   return (
-    <Stack>
-      <Title order={3}>{t.practice.title}</Title>
-      <Group>
+    <Stack gap="xl">
+      <PageHeader eyebrow="Không gian sinh viên" title={t.practice.title} description="Chọn bài phù hợp với trình độ và bắt đầu một phiên luyện tập mới." />
+      <Paper className="surface-card" p="lg">
+      <Group justify="space-between" mb="md"><Box><Text fw={700}>Bộ lọc bài tập</Text><Text size="sm" c="dimmed">Tìm bài theo độ khó và ngôn ngữ bạn muốn luyện.</Text></Box><Badge variant="light">{q.data?.total ?? 0} bài</Badge></Group>
+      <SimpleGrid cols={{ base: 1, sm: 2 }}>
         <Select
           label={t.practice.difficulty}
           placeholder={t.practice.all}
@@ -50,12 +53,14 @@ export function ProblemListPage() {
           }}
           data={Object.entries(languageLabel).map(([value, label]) => ({ value, label }))}
         />
-      </Group>
-      {q.isPending && <Loader />}
+      </SimpleGrid>
+      </Paper>
+      {q.isPending && <Center py="xl"><Loader /></Center>}
       <ErrorAlert error={q.error} />
-      {q.data && q.data.items.length === 0 && <Text c="dimmed">{t.practice.empty}</Text>}
+      {q.data && q.data.items.length === 0 && <Paper className="empty-panel" p={48}><Center><Stack align="center" gap={5}><Text fz={32}>⌘</Text><Text fw={700}>{t.practice.empty}</Text><Text size="sm" c="dimmed">Thử thay đổi bộ lọc hoặc tham gia thêm lớp học.</Text></Stack></Center></Paper>}
       {q.data && q.data.items.length > 0 && (
-        <Table striped highlightOnHover data-testid="problem-table">
+        <Paper className="table-card">
+        <Table.ScrollContainer minWidth={680}><Table highlightOnHover verticalSpacing="md" horizontalSpacing="lg" data-testid="problem-table">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>{t.practice.columns.title}</Table.Th>
@@ -67,20 +72,20 @@ export function ProblemListPage() {
           <Table.Tbody>
             {q.data.items.map((p) => (
               <Table.Tr key={p.id}>
-                <Table.Td>{p.title}</Table.Td>
-                <Table.Td>{p.difficulty ? <Badge variant="light">{difficultyLabel[p.difficulty] ?? p.difficulty}</Badge> : "—"}</Table.Td>
-                <Table.Td>{p.supported_languages.map((l) => languageLabel[l] ?? l).join(", ")}</Table.Td>
+                <Table.Td><Text fw={650}>{p.title}</Text><Text size="xs" c="dimmed">Sẵn sàng luyện tập</Text></Table.Td>
+                <Table.Td>{p.difficulty ? <Badge variant="light" color={p.difficulty === "HARD" ? "red" : p.difficulty === "MEDIUM" ? "yellow" : "teal"}>{difficultyLabel[p.difficulty] ?? p.difficulty}</Badge> : "—"}</Table.Td>
+                <Table.Td><Group gap={5}>{p.supported_languages.map((l) => <Badge key={l} color="gray" variant="light">{languageLabel[l] ?? l}</Badge>)}</Group></Table.Td>
                 <Table.Td>
-                  <Button component={Link} to={`/practice/problems/${p.id}`} size="xs">
+                  <Button component={Link} to={`/practice/problems/${p.id}`} size="sm" variant="light">
                     {t.practice.open}
                   </Button>
                 </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
-        </Table>
+        </Table></Table.ScrollContainer></Paper>
       )}
-      {q.data && q.data.total > PAGE_SIZE && <Pagination total={Math.ceil(q.data.total / PAGE_SIZE)} value={page} onChange={setPage} />}
+      {q.data && q.data.total > PAGE_SIZE && <Group justify="center"><Pagination total={Math.ceil(q.data.total / PAGE_SIZE)} value={page} onChange={setPage} /></Group>}
     </Stack>
   );
 }

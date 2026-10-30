@@ -9,6 +9,8 @@ import { ClassPage } from "./features/teacher/ClassPage";
 import { LiveProvider } from "./features/teacher/LiveProvider";
 import { SessionPage } from "./features/teacher/SessionPage";
 import { StudentPage } from "./features/teacher/StudentPage";
+import { ProblemEditorPage } from "./features/teacher/ProblemEditorPage";
+import { ProblemsPage } from "./features/teacher/ProblemsPage";
 import { AppLayout, RequireAuth, RoleHome } from "./ui/Layout";
 
 const router = createBrowserRouter([
@@ -38,6 +40,9 @@ const router = createBrowserRouter([
               { path: "classes/:classId", element: <ClassPage /> },
               { path: "classes/:classId/students/:studentId", element: <StudentPage /> },
               { path: "classes/:classId/students/:studentId/sessions/:sessionId", element: <SessionPage /> },
+              { path: "problems", element: <ProblemsPage /> },
+              { path: "problems/new", element: <ProblemEditorPage /> },
+              { path: "problems/:problemId", element: <ProblemEditorPage /> },
             ],
           },
         ],

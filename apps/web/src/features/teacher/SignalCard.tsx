@@ -23,7 +23,7 @@ export function SignalCard({ classId, signal, onGoTo }: { classId: string; signa
   });
   const ev = signal.evidence as Record<string, unknown>;
   return (
-    <Paper withBorder p="sm" data-testid="signal-card" data-signal-type={signal.signal_type} data-status={signal.status}>
+    <Paper withBorder p="md" data-testid="signal-card" data-signal-type={signal.signal_type} data-status={signal.status} bg={signal.status === "NEW" ? "orange.0" : "white"}>
       <Group justify="space-between" align="flex-start">
         <div>
           <Group gap="xs">
