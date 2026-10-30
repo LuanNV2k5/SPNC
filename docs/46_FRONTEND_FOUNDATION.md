@@ -1,7 +1,7 @@
 # 46 — FRONTEND FOUNDATION AND STUDENT PRACTICE (PHASE 20A) SPECIFICATION
 
 > **Module:** web client (`apps/web`): foundation, authentication, student practice flow with trace capture
-> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md)
+> **Status:** APPROVED 2026-10-29 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md) — LOCKED 2026-10-30 (`phase-20a-frontend-foundation-locked`, on the merge commit of the lock PR)
 > **Date:** 2026-10-29
 > **Parent Baseline:** `phase-19-retention-locked` (`5c77f97`; `main` = `5c92774`, docs-only roadmap PR #9 on top)
 > **Proposed Branch:** `phase20a`
@@ -199,4 +199,5 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 | AC-20A-11 production image through `web` | separate compose project `spnc20a` (ports 18000/18080/19001; demo stack `phase11` untouched) | SPA route reload 200 with CSP, `nosniff`; `/api/v1/auth/me` 401 with the client `X-Request-ID` echoed; WebSocket upgrade 101; `/docs`, `/openapi.json`, `/health`, `/ready`, `/metrics` return only the SPA shell |
 | AC-20A-02/04/05/07/08/12 Playwright (4 tests) | same stack, Chromium | **4 passed**: forced password change and reload; teacher placeholder and `FORBIDDEN_ROLE` with request id; full practice session (checkpoint, run, submit ACCEPTED), server trace contiguous `1..N` with every event type, replay = submitted snapshot exactly; ingest failure + reload: no gap, no duplicate, replay = run snapshot exactly |
 | AC-20A-03 two tabs | unit tests (serializing lock stand-in) | one rotation per tab burst; each rotation uses the newest stored token; not exercised with two real browser tabs |
-| AC-20A-12 CI | GitHub Actions on the PR | _pending_ |
+| AC-20A-12 CI on PR #10 | GitHub-hosted `ubuntu-24.04`, runs 40970626492 (push) and 40970682193 (pull_request) | all 6 backend groups and `web` green, `ci` green (16 checks passed, 0 failed; compose E2E and backup drill skipped as on every PR); merged as `b1a4f0f` (merge commit) |
+| AC-20A-12 browser E2E in CI | push to `main` after the merge, run 40996813410, job `compose E2E` | backend E2E 5 passed; **Playwright 4 passed** (first CI run of the step); every job green |
