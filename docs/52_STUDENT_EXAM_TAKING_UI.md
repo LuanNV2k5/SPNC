@@ -93,3 +93,5 @@ It returns exam problems in `order_index` order with each problem's id, title, s
 | Generated API client | PASS — backend OpenAPI and generated client match. |
 | Migration | None. |
 | Lock | Recorded in `docs/PROJECT_PROVENANCE_LOG.md`; tag points to the lock PR merge commit. |
+
+Post-merge follow-up: main Compose E2E run `41105789029` caught the student home redirect breaking the existing practice journey. PR #20 (`c8907c1`) restores `/practice` as the student home while keeping exams in navigation; workflow-dispatch run `41106800105` passed the complete CI and Compose E2E suite.
