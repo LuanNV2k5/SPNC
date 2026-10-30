@@ -59,7 +59,7 @@ test("AC-21A-01: teacher creates, configures and publishes an exam, then observe
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   if (reviewDir) await page.screenshot({ path: join(reviewDir, "exam-detail-mobile.png"), fullPage: true });
   const mobileProblemPicker = await page.getByRole("textbox", { name: "Đề bài" }).boundingBox();
   expect(mobileProblemPicker?.width ?? 0).toBeGreaterThan(220);
@@ -68,7 +68,7 @@ test("AC-21A-01: teacher creates, configures and publishes an exam, then observe
   await page.getByRole("link", { name: /Kỳ thi/ }).click();
   await expect(page).toHaveURL(/\/teacher\/exams$/);
   await expect(page.getByText(title)).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   if (reviewDir) await page.screenshot({ path: join(reviewDir, "exam-list-mobile.png"), fullPage: true });
   await page.getByRole("link", { name: "Quản lý" }).click();
   await expect(page).toHaveURL(/\/teacher\/exams\/[0-9a-f-]+$/);

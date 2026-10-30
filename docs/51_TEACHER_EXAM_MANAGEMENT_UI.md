@@ -1,6 +1,6 @@
 # Phase 21A — Teacher exam management UI
 
-> **Status:** IMPLEMENTED — CI, COMPOSE E2E, AND DESKTOP/MOBILE FUNCTIONAL REVIEW PASS
+> **Status:** IMPLEMENTED — DESKTOP/MOBILE FUNCTIONAL REVIEW PASS; CI RE-RUN REQUIRED
 > **Date:** 2026-10-30
 > **Baseline:** `phase-20e-ui-polish-locked` (`ae9f7b6`)
 
@@ -49,7 +49,7 @@ Only `DRAFT` exams can be configured. Publishing remains available only for draf
 | `git diff --check` | PASS |
 | Playwright AC-21A-01 | PASS — 10/10 browser tests passed in CI Compose; local isolated Compose regression passed after responsive checks were added. |
 | Desktop/mobile functional review | PASS — reviewed exam detail and list at desktop and 390×844 mobile. Mobile problem, score and add controls stack vertically; navigation and management links work; page has no horizontal overflow. Wide tables retain horizontal scrolling so remaining columns/actions stay reachable. |
-| CI / PR | PASS; PR #16 is open as a draft. |
+| CI / PR | Frontend and backend checks pass. Compose Playwright caught an AppShell resize transition race in the new mobile overflow assertion; assertion now waits for responsive layout to settle. CI rerun pending; PR #16 remains a draft. |
 | Merge / lock tag | Pending owner decision after visual review. |
 
 ## 5. Remaining work to close this phase
