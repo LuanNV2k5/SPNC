@@ -1,8 +1,10 @@
 # Phase 21B — Student exam-taking UI
 
-> **Status:** APPROVED — 2026-10-31
+> **Status:** LOCKED — `phase-21b-student-exam-taking-ui-locked`
+> **Date:** 2026-10-31
 > **Approval:** Project Owner explicit authorization: “ok tiếp” (2026-10-31), approving decisions D1–D8 below.
 > **Parent baseline:** `phase-21a-teacher-exam-ui-locked` (`de09220`)
+> **Merged:** PR #18 (`4955ec5`)
 > **Scope intent:** functional UI wired to the existing exam/session APIs; no visual-polish pass.
 
 ## 1. Context and gap
@@ -79,3 +81,15 @@ It returns exam problems in `order_index` order with each problem's id, title, s
 - Changes to exam lifecycle rules, scheduler behavior, judging policy or result-visibility policy.
 - Database migrations, unless implementation discovers a contract gap that cannot be solved additively; any such change requires a new decision before coding.
 - Visual redesign or polish.
+
+## 7. Lock record
+
+| Check | Result |
+|---|---|
+| Frontend lint, typecheck, unit tests, production build | PASS — 46 unit tests; build succeeds (existing main-chunk size warning). |
+| Backend exam lifecycle tests | PASS — 15 passed. |
+| Compose integration and student exam Playwright | PASS — 5 integration tests and 1 desktop/mobile journey test. |
+| GitHub CI | PASS — all jobs green on push run `41102040017` and PR run `41102136212`, attempt 2. The initial PR auth run had one concurrent-refresh race failure; the rerun passed. |
+| Generated API client | PASS — backend OpenAPI and generated client match. |
+| Migration | None. |
+| Lock | Recorded in `docs/PROJECT_PROVENANCE_LOG.md`; tag points to the lock PR merge commit. |

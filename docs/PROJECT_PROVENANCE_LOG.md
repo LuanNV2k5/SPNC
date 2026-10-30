@@ -934,3 +934,24 @@ Project Owner explicit authorization (2026-10-31): “ok tiếp” in response t
 
 Approved Decisions:
 All decisions D1–D8 in `docs/52_STUDENT_EXAM_TAKING_UI.md` §4 are approved without overrides. Scope is student exam-taking UI with a student-scoped problem-content endpoint exposing public samples only; participation must be in progress before problem access; reuse existing exam sessions and workspace; display the server-derived informational deadline; confirm explicit finalization without auto-submission; obey `result_visible`; preserve backend access errors; verify API/UI behavior across desktop and mobile. No migration or visual-polish pass is approved.
+
+---
+
+## Decision: Phase 21B Lock
+
+Date:
+2026-10-31
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-31): “ok tiếp” after the CI-green handoff report identified PR #18 and the lock/tag steps as remaining.
+
+Locked Baseline:
+| Phase | Spec | Merged via | Tag | Verification |
+|---|---|---|---|---|
+| 21B Student exam-taking UI | docs/52 | PR #18 (`8d8e496`; merge commit `4955ec5`), lock PR (this change) | `phase-21b-student-exam-taking-ui-locked` on the merge commit of the lock PR | Frontend lint/typecheck, 46 unit tests, production build; backend exam lifecycle 15 passed; Compose integration 5 passed; student desktop/mobile Playwright journey passed; generated API client matches; all CI jobs green on push run 41102040017 and PR run 41102136212 attempt 2. Initial PR auth attempt exposed one existing concurrent-refresh race failure, which passed on rerun. |
+
+Note:
+Student exam-taking UI with one additive student-scoped problem-content endpoint; no database migration. Hidden tests remain server-only. No visual-polish pass was performed. The main JavaScript bundle remains above the Vite size warning threshold. Admin/statistics UI and other deferred roadmap work remain unordered and require a separate scope decision.
