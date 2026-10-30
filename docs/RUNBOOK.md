@@ -173,3 +173,4 @@ docker compose exec api python -m app.cli retention-purge --apply     # delete (
   ```
   It creates its own teacher, student and problem. One test waits about a minute for a checkpoint.
 - **Browser storage:** unsent trace events and the editor draft of each open session are kept in the browser's IndexedDB (`spnc-trace`) until the server confirms them; logging out deletes them for that user. A trace-status badge above the editor shows unsent events.
+- **Teacher screens (docs/47):** a TEACHER lands on `/teacher/classes` (create class, invite code, attention list, roster, student sessions, session replay with snapshot checks, signals, notes). Students join a class at `/classes` with the invite code. Live updates use the teacher WebSocket through `web`; a page shows "Trực tiếp" when connected.

@@ -148,11 +148,25 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 | Commit | Content |
 |---|---|
 | `9dacacc` | This specification (draft) |
+| `b102101` | Spec approval (PROJECT_PROVENANCE_LOG) |
+| `e3ecf43` | Backend (D2): `MemberResponse` + `username`, `full_name` (pydantic before-validator from the `student` relationship, `joinedload` in the member query); test `test_P20B_member_list_carries_student_names` (group `academic`); regenerated `openapi.json` and `schema.d.ts` |
+| `1b03485` | `src/trace/replay.ts` + tests; `src/api/teacherSocket.ts` + tests; teacher pages (classes, class with attention/roster/invite code, student, session replay with snapshot verification, signals, runs, annotations) and `LiveProvider`; student `/classes` join page; statement shown only after the session starts (D7); teacher strings, neutral signal summaries and the forbidden-word test |
+| _(this commit)_ | Playwright `e2e/teacher.spec.ts` (3 tests), 20A test updated for the teacher home, `run-item` test id, RUNBOOK §11, this record |
 
 ### 7.2 Implementation Notes (within the approved decisions)
-_None yet._
+- **`FAST_FIRST_CODE` is evaluated only for ACTIVE sessions** by the signal scheduler's 60 s cycle (`materializer._process_active_sessions`). A session submitted or ended before the next cycle never gets the signal, even when its first keystroke came within 30 s. This is backend behaviour outside 20B (signal rules are out of scope, §3.10); the E2E test therefore waits for the signal before submitting. Backend follow-up: evaluate it at finalisation too.
+- **Snapshot matching window.** The client creates a snapshot and then records its event, so keystrokes typed in between are not in the snapshot. `verify` accepts a match at any of the 50 events before the snapshot's event; only if none matches is it a mismatch and the replay rebases.
+- **Snapshot content is cached per page load** (snapshots are immutable, REQ-TRACE-014), so the 15 s refresh of an ACTIVE session re-verifies without refetching contents.
+- **Live notification → timeline.** `run.completed` can arrive before the client's `RUN_REQUESTED` event is ingested; the run row itself (in `timeline.runs`) is what updates at once, the trace event follows with the next refresh. The E2E test asserts on the run row within 8 s (below the 15 s refresh).
+- **ADMIN** still sees the placeholder (20D). The 20A test for the teacher placeholder now checks the teacher home `/teacher/classes`.
+- **Teacher query keys** all start with `"t"`; a WebSocket (re)connect invalidates them all (REST resync), a notification invalidates the attention lists, the student's sessions and signals, and the session's timeline.
 
 ### 7.3 Verification
 | Check | Environment | Result |
 |---|---|---|
-| | | |
+| Vitest (20A suites + replay engine, teacher socket, wording) | this machine, Node 24, jsdom | **41 passed** (28 from 20A + 13); 20 000-event seek < 1 s |
+| Lint, typecheck, production build, client staleness | same | clean; build OK; regenerated client committed |
+| AC-20B-03 `test_P20B_member_list_carries_student_names` | own PostgreSQL 16 on port 55435 | passed (group `academic`: 108 passed) |
+| Full local regression `regression.sh all` | same, every group isolated | **596 passed, 0 failed** (48 files; 595 before this phase + 1) |
+| AC-20B-01..10 Playwright (7 tests: 4 from 20A, 3 new) | separate compose project `spnc20b` (ports 18000/18080/19001; demo stack `phase11` untouched), Chromium | **7 passed**: class created, join with wrong then right code, roster shows the name; FAST_FIRST_CODE appears in the attention list, replay verified against every snapshot with 0 mismatches and ✓ at the submission, signal acknowledged, note added; a student run reaches the open teacher session page over the WebSocket within 8 s |
+| AC-20B-12 CI | GitHub Actions on the PR | _pending_ |

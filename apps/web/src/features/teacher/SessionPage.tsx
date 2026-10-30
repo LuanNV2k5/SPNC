@@ -246,7 +246,7 @@ export function SessionPage() {
             {timeline.runs.map((r) => {
               const ev = events.find((e) => e.event_type === "RUN_REQUESTED" && e.payload.run_id === r.id);
               return (
-                <Group key={r.id} gap="xs">
+                <Group key={r.id} gap="xs" data-testid="run-item" data-status={r.status}>
                   <Badge variant="light" color={r.verdict === "ACCEPTED" ? "green" : "red"}>
                     {r.verdict ? (t.verdicts[r.verdict] ?? r.verdict) : r.status}
                   </Badge>
