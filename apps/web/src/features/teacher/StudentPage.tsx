@@ -1,4 +1,4 @@
-import { Badge, Button, Grid, Group, Loader, Select, Stack, Table, Text, Title } from "@mantine/core";
+import { Badge, Box, Button, Center, Grid, Group, Loader, Paper, Select, Stack, Table, Text, Title } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
@@ -28,23 +28,18 @@ export function StudentPage() {
   const member = members.data?.items.find((m) => m.student_id === studentId);
 
   return (
-    <Stack>
-      <Group justify="space-between">
-        <Title order={3}>
-          {member?.full_name ?? studentId} <Text span c="dimmed" size="sm">{member?.username}</Text>
-        </Title>
-        <LiveBadge />
-      </Group>
+    <Stack gap="xl">
+      <Group justify="space-between" align="flex-end"><Box><Text size="xs" fw={700} c="indigo" tt="uppercase" lts="0.1em">Hồ sơ học tập</Text><Title order={2} mt={4}>{member?.full_name ?? studentId}</Title><Text c="dimmed" mt={5}>{member?.username} · Các phiên làm bài và tín hiệu hỗ trợ</Text></Box><LiveBadge /></Group>
       <Grid>
         <Grid.Col span={{ base: 12, lg: 7 }}>
-          <Title order={5} mb="xs">
+          <Paper className="surface-card" p="lg"><Title order={4} mb="lg">
             {tt.student.sessions}
           </Title>
-          {sessions.isPending && <Loader />}
+          {sessions.isPending && <Center py="xl"><Loader /></Center>}
           <ErrorAlert error={sessions.error} />
           {sessions.data && sessions.data.items.length === 0 && <Text c="dimmed">{tt.student.noSessions}</Text>}
           {sessions.data && sessions.data.items.length > 0 && (
-            <Table striped data-testid="session-table">
+            <Table.ScrollContainer minWidth={760}><Table highlightOnHover data-testid="session-table" verticalSpacing="md">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>{tt.student.problem}</Table.Th>
@@ -81,12 +76,13 @@ export function StudentPage() {
                   </Table.Tr>
                 ))}
               </Table.Tbody>
-            </Table>
+            </Table></Table.ScrollContainer>
           )}
+          </Paper>
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 5 }}>
-          <Stack>
-            <Title order={5}>{tt.student.signals}</Title>
+          <Paper className="surface-card" p="lg"><Stack>
+            <Box><Title order={4}>{tt.student.signals}</Title><Text size="sm" c="dimmed">Tín hiệu giúp ưu tiên quan sát, không thay thế đánh giá của giảng viên.</Text></Box>
             <Group>
               <Select
                 size="xs"
@@ -102,7 +98,7 @@ export function StudentPage() {
             {signals.data && signals.data.items.length === 0 && <Text c="dimmed">{tt.student.noSignals}</Text>}
             {signals.data?.items.map((s) => <SignalCard key={s.id} classId={classId} signal={s} />)}
             <Annotations studentId={studentId} />
-          </Stack>
+          </Stack></Paper>
         </Grid.Col>
       </Grid>
     </Stack>

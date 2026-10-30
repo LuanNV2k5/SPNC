@@ -1,4 +1,4 @@
-import { Button, Container, Paper, PasswordInput, Stack, Text, Title } from "@mantine/core";
+import { Box, Button, Container, Paper, PasswordInput, Stack, Text, Title } from "@mantine/core";
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { api, call } from "../../api/client";
@@ -39,22 +39,24 @@ export function ChangePasswordPage() {
   };
 
   return (
-    <Container size={420} py={80}>
-      <Paper withBorder p="lg" radius="md">
+    <Box className="auth-screen">
+    <Container size={460} w="100%" px="md">
+      <Paper className="auth-card" withBorder p={{ base: "lg", sm: 32 }} radius="xl">
         <form onSubmit={submit}>
-          <Stack>
-            <Title order={4}>{t.changePassword.title}</Title>
+          <Stack gap="lg">
+            <Box><Text size="xs" fw={700} c="indigo" tt="uppercase">Bảo mật tài khoản</Text><Title order={3} mt={4}>{t.changePassword.title}</Title></Box>
             {user.force_password_change && <Text size="sm">{t.changePassword.intro}</Text>}
             <PasswordInput label={t.changePassword.current} value={current} onChange={(e) => setCurrent(e.currentTarget.value)} required autoComplete="current-password" name="current_password" />
             <PasswordInput label={t.changePassword.next} value={next} onChange={(e) => setNext(e.currentTarget.value)} required autoComplete="new-password" name="new_password" />
             <PasswordInput label={t.changePassword.confirm} value={confirm} onChange={(e) => setConfirm(e.currentTarget.value)} required autoComplete="new-password" name="confirm_password" />
             <ErrorAlert error={error} />
-            <Button type="submit" loading={busy}>
+            <Button type="submit" loading={busy} size="md">
               {t.changePassword.submit}
             </Button>
           </Stack>
         </form>
       </Paper>
     </Container>
+    </Box>
   );
 }

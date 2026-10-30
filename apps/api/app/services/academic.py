@@ -255,6 +255,16 @@ def publish_to_class(db: Session, owner: User, problem_id: uuid.UUID, req: Publi
 
     return repo.create_publication(db, problem_id=problem_id, class_id=req.class_id)
 
+
+def list_problem_publications(db: Session, owner: User, problem_id: uuid.UUID):
+    p = repo.get_problem_by_id(db, problem_id)
+    if not p:
+        raise HTTPException(status_code=404, detail=_error("PROBLEM_NOT_FOUND", "Problem not found"))
+    if p.owner_id != owner.id:
+        raise HTTPException(status_code=403, detail=_error("PROBLEM_FORBIDDEN", "Not your problem"))
+    assert_not_deleted(p)
+    return repo.get_publications_for_problem(db, problem_id)
+
 def unpublish_from_class(db: Session, owner: User, problem_id: uuid.UUID, class_id: uuid.UUID):
     p = repo.get_problem_by_id(db, problem_id)
     if not p:

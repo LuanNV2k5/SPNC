@@ -30,7 +30,7 @@ from app.schemas.academic import (
     EnrollRequest, MemberResponse, MemberListResponse,
     # Problem
     ProblemCreateRequest, ProblemUpdateRequest, ProblemResponse, ProblemListResponse,
-    PublishToCLassRequest, PublicationResponse,
+    PublishToCLassRequest, PublicationResponse, PublicationListResponse,
     # Exam
     ExamCreateRequest, ExamUpdateRequest, ExamResponse, ExamListResponse,
     AttachProblemRequest, ExamProblemResponse,
@@ -355,6 +355,21 @@ def publish_to_class(
     db.commit()
     db.refresh(pub)
     return pub
+
+
+@router.get(
+    "/problems/{problem_id}/publications",
+    response_model=PublicationListResponse,
+    tags=["problems"],
+    summary="[P20C-P01] List classes a problem is published to (Teacher owner only)",
+)
+def list_problem_publications(
+    problem_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    items = svc.list_problem_publications(db, owner=current_user, problem_id=problem_id)
+    return {"items": items, "total": len(items)}
 
 
 @router.delete(

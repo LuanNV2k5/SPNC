@@ -210,6 +210,12 @@ def create_publication(db: Session, problem_id: uuid.UUID, class_id: uuid.UUID) 
     return pub
 
 
+def get_publications_for_problem(db: Session, problem_id: uuid.UUID) -> List[ProblemClassPublication]:
+    return db.query(ProblemClassPublication).filter(
+        ProblemClassPublication.problem_id == problem_id,
+    ).order_by(ProblemClassPublication.created_at.asc()).all()
+
+
 def delete_publication(db: Session, pub: ProblemClassPublication) -> None:
     db.delete(pub)
     db.flush()

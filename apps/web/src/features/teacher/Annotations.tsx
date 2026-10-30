@@ -11,7 +11,7 @@ function Item({ a, onChanged }: { a: Annotation; onChanged: () => void }) {
   const save = useMutation({ mutationFn: () => updateAnnotation(a.id, text), onSuccess: () => (setEditing(false), onChanged()) });
   const del = useMutation({ mutationFn: () => deleteAnnotation(a.id), onSuccess: onChanged });
   return (
-    <Paper withBorder p="xs" data-testid="annotation">
+    <Paper withBorder p="md" data-testid="annotation" bg="gray.0">
       {editing ? (
         <Stack gap={4}>
           <Textarea value={text} onChange={(e) => setText(e.currentTarget.value)} autosize minRows={2} maxLength={5000} />

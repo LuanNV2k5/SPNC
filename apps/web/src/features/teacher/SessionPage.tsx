@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Grid, Group, Loader, Paper, ScrollArea, Slider, Stack, Switch, Table, Text, Title } from "@mantine/core";
+import { Alert, Badge, Box, Button, Grid, Group, Loader, Paper, ScrollArea, Slider, Stack, Switch, Table, Text, Title } from "@mantine/core";
 import { DiffEditor, Editor } from "@monaco-editor/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -131,17 +131,18 @@ export function SessionPage() {
   const verified = Object.values(checks);
 
   return (
-    <Stack>
-      <Group justify="space-between">
-        <div>
-          <Title order={3}>{s.problem_title}</Title>
+    <Stack gap="xl">
+      <Group justify="space-between" align="flex-end">
+        <Box>
+          <Text size="xs" fw={700} c="indigo" tt="uppercase" lts="0.1em">Phát lại phiên làm bài</Text>
+          <Title order={2} mt={4}>{s.problem_title}</Title>
           <Text size="sm" c="dimmed">
             {tt.context[s.context] ?? s.context} · {tt.student.opened} {fmt(s.opened_at)} · {tt.session.firstCode} {fmt(s.first_code_at)} · {tt.student.ended}{" "}
             {fmt(s.ended_at)}
             {s.working_time_seconds != null ? ` · ${tt.session.workingTime} ${Math.round(s.working_time_seconds / 60)} phút` : ""}
             {s.final_loc != null ? ` · ${tt.session.finalLoc} ${s.final_loc}` : ""}
           </Text>
-        </div>
+        </Box>
         <Group>
           <Badge variant="light" color={s.status === "ACTIVE" ? "green" : "gray"}>
             {tt.sessionStatus[s.status] ?? s.status}
@@ -156,9 +157,9 @@ export function SessionPage() {
       {replay.gapAfter !== null && <Alert color="yellow">{tt.session.gap(replay.gapAfter)}</Alert>}
       <ErrorAlert error={checkError} />
 
-      <Grid>
+      <Grid gutter="xl" align="flex-start">
         <Grid.Col span={{ base: 12, lg: 8 }}>
-          <Stack gap="xs">
+          <Paper className="surface-card" p={{ base: "md", sm: "lg" }}><Stack gap="md">
             <Group justify="space-between">
               <Text size="sm" data-testid="replay-position" data-sequence={at}>
                 {tt.session.position(at, last)}
@@ -194,16 +195,16 @@ export function SessionPage() {
                 {checks[pointHere.snapshotId]!.status === "match" ? `✓ ${tt.session.match}` : tt.session.mismatch}
               </Badge>
             )}
-            <Paper withBorder>
+            <Paper withBorder style={{ overflow: "hidden" }}>
               {compare && pointHere && contents[pointHere.snapshotId] !== undefined ? (
                 <DiffEditor height="380px" language={MONACO_LANGUAGE[timelineLanguage(events)] ?? "plaintext"} original={contents[pointHere.snapshotId]} modified={code} options={{ readOnly: true, minimap: { enabled: false } }} />
               ) : (
                 <Editor height="380px" language={MONACO_LANGUAGE[timelineLanguage(events)] ?? "plaintext"} value={code} options={{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false }} />
               )}
             </Paper>
-            <Title order={6}>{tt.session.events}</Title>
-            <ScrollArea h={260}>
-              <Table verticalSpacing={2} data-testid="event-list">
+            <Group justify="space-between"><Title order={5}>{tt.session.events}</Title><Badge variant="light" color="gray">{events.length} sự kiện</Badge></Group>
+            <ScrollArea h={260} type="always">
+              <Table verticalSpacing="xs" data-testid="event-list" highlightOnHover>
                 <Table.Tbody>
                   {nearby.length === 0 && (
                     <Table.Tr>
@@ -220,10 +221,10 @@ export function SessionPage() {
                 </Table.Tbody>
               </Table>
             </ScrollArea>
-          </Stack>
+          </Stack></Paper>
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 4 }}>
-          <Stack>
+          <Paper className="surface-card" p="lg"><Stack>
             <Title order={5}>{tt.session.snapshot}</Title>
             <Group gap={4}>
               {points.map((p) => (
@@ -273,7 +274,7 @@ export function SessionPage() {
               />
             ))}
             <Annotations studentId={studentId} sessionId={sessionId} signals={timeline.signals} />
-          </Stack>
+          </Stack></Paper>
         </Grid.Col>
       </Grid>
     </Stack>

@@ -1,9 +1,10 @@
-import { Alert, Button, Group, Loader, Paper, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Badge, Box, Button, Center, Group, Loader, Paper, Stack, Table, Text, TextInput } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { api, call } from "../../api/client";
 import { tt, ts } from "../../i18n/vi";
 import { ErrorAlert } from "../../ui/ErrorAlert";
+import { PageHeader } from "../../ui/PageHeader";
 
 /** Student: joined classes and join-by-invite-code (docs/47 §3.5). */
 export function MyClassesPage() {
@@ -24,12 +25,12 @@ export function MyClassesPage() {
   };
 
   return (
-    <Stack>
-      <Title order={3}>{ts.title}</Title>
-      <Paper withBorder p="sm">
+    <Stack gap="xl">
+      <PageHeader eyebrow="Không gian sinh viên" title={ts.title} description="Tham gia lớp bằng mã mời do giảng viên cung cấp." />
+      <Paper className="surface-card" p="lg">
         <form onSubmit={submit}>
-          <Group align="flex-end">
-            <TextInput label={ts.code} value={code} onChange={(e) => setCode(e.currentTarget.value)} required maxLength={16} name="invite_code" />
+          <Group align="flex-end" justify="space-between">
+            <Box style={{ flex: "1 1 260px" }}><Text fw={700}>Tham gia lớp mới</Text><Text size="sm" c="dimmed" mb="sm">Mã không phân biệt chữ hoa và chữ thường.</Text><TextInput label={ts.code} placeholder="Ví dụ: ABCD1234" value={code} onChange={(e) => setCode(e.currentTarget.value)} required maxLength={16} name="invite_code" /></Box>
             <Button type="submit" loading={join.isPending}>
               {ts.join}
             </Button>
@@ -42,11 +43,11 @@ export function MyClassesPage() {
         )}
         <ErrorAlert error={join.error} />
       </Paper>
-      {classes.isPending && <Loader />}
+      {classes.isPending && <Center py="xl"><Loader /></Center>}
       <ErrorAlert error={classes.error} />
-      {classes.data && classes.data.items.length === 0 && <Text c="dimmed">{ts.empty}</Text>}
+      {classes.data && classes.data.items.length === 0 && <Paper className="empty-panel" p={48}><Center><Stack align="center" gap={5}><Text fz={32}>▦</Text><Text fw={700}>{ts.empty}</Text><Text size="sm" c="dimmed">Nhập mã mời phía trên để lớp xuất hiện tại đây.</Text></Stack></Center></Paper>}
       {classes.data && classes.data.items.length > 0 && (
-        <Table data-testid="my-class-table">
+        <Paper className="table-card"><Table data-testid="my-class-table" verticalSpacing="md" horizontalSpacing="lg">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>{tt.classes.name}</Table.Th>
@@ -56,12 +57,12 @@ export function MyClassesPage() {
           <Table.Tbody>
             {classes.data.items.map((c) => (
               <Table.Tr key={c.id}>
-                <Table.Td>{c.name}</Table.Td>
-                <Table.Td>{c.academic_year}</Table.Td>
+                <Table.Td><Group gap="sm"><Badge size="lg" circle color="indigo">{c.name.charAt(0).toUpperCase()}</Badge><Text fw={650}>{c.name}</Text></Group></Table.Td>
+                <Table.Td><Badge variant="light" color="gray">{c.academic_year}</Badge></Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
-        </Table>
+        </Table></Paper>
       )}
     </Stack>
   );

@@ -112,3 +112,46 @@ test("AC-20B-09: a student's run reaches the open teacher page live, without rel
   // run.completed arrives over the socket; well before the 15 s refresh of an ACTIVE session
   await expect(tp.locator('[data-testid="run-item"][data-status="COMPLETED"]')).toHaveCount(1, { timeout: 8_000 });
 });
+
+test("AC-PROBLEM-UI-01: teacher authors a class problem with a sample and publishes it", async ({ browser }) => {
+  const admin = await adminToken();
+  const teacher = await createUser(admin, "TEACHER", true);
+  const student = await createUser(admin, "STUDENT", true);
+  const tp = await loggedIn(browser, teacher.username);
+
+  await tp.getByLabel("Tên lớp").fill("Lớp tác giả đề");
+  await tp.getByRole("button", { name: "Tạo lớp" }).click();
+  await tp.getByTestId("class-table").getByRole("link", { name: "Mở" }).click();
+  const invite = (await tp.getByTestId("invite-code").innerText()).trim();
+
+  const sp = await loggedIn(browser, student.username);
+  await sp.goto("/classes");
+  await sp.getByLabel("Mã tham gia").fill(invite);
+  await sp.getByRole("button", { name: "Tham gia lớp" }).click();
+  await expect(sp.getByTestId("join-ok")).toBeVisible();
+
+  await tp.getByRole("link", { name: "Đề bài" }).click();
+  await tp.getByRole("link", { name: "Tạo đề" }).click();
+  await tp.getByLabel("Tên bài").fill("Tổng hai số qua UI");
+  await tp.getByLabel("Nội dung đề").fill("Cho hai số nguyên a và b. Hãy in tổng của chúng.");
+  await tp.getByRole("textbox", { name: "Phạm vi hiển thị" }).click();
+  await tp.getByRole("option", { name: "Theo lớp" }).click();
+  await tp.getByTestId("save-problem").click();
+  await expect(tp).toHaveURL(/\/teacher\/problems\/[0-9a-f-]+$/);
+
+  await tp.getByRole("tab", { name: "Testcase" }).click();
+  await tp.getByLabel("Dữ liệu vào").first().fill("1 2\n");
+  await tp.getByLabel("Kết quả mong đợi").first().fill("3\n");
+  await tp.getByLabel("Hiển thị làm ví dụ").check();
+  await tp.getByRole("button", { name: "Thêm testcase" }).click();
+  await expect(tp.getByTestId("test-case-item")).toContainText("Ví dụ");
+
+  await tp.getByRole("tab", { name: "Phát hành" }).click();
+  await tp.getByRole("textbox", { name: "Chọn lớp" }).click();
+  await tp.getByRole("option", { name: /Lớp tác giả đề/ }).click();
+  await tp.getByRole("button", { name: "Phát hành", exact: true }).click();
+  await expect(tp.getByTestId("publication-table")).toContainText("Lớp tác giả đề");
+
+  await sp.goto("/practice");
+  await expect(sp.getByTestId("problem-table")).toContainText("Tổng hai số qua UI");
+});

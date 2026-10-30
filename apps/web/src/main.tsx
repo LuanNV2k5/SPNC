@@ -7,6 +7,7 @@ import { App } from "./App";
 import { ApiError } from "./api/errors";
 import { AuthProvider } from "./features/auth/AuthContext";
 import "./features/practice/monacoSetup";
+import "./app.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,7 +21,21 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <MantineProvider>
+    <MantineProvider
+      theme={{
+        primaryColor: "indigo",
+        defaultRadius: "md",
+        fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        headings: { fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontWeight: "700" },
+        components: {
+          Button: { defaultProps: { radius: "md" } },
+          Paper: { defaultProps: { radius: "lg" } },
+          TextInput: { defaultProps: { radius: "md" } },
+          Textarea: { defaultProps: { radius: "md" } },
+          Select: { defaultProps: { radius: "md" } },
+        },
+      }}
+    >
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <App />

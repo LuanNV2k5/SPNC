@@ -278,8 +278,8 @@ export function Workspace({ session, userId, initialContent, onClosed }: Props) 
 
   const phase = status?.phase ?? "idle";
   return (
-    <Stack>
-      <Group justify="space-between">
+    <Stack gap="lg">
+      <Paper className="surface-card" p="sm"><Group justify="space-between">
         <Badge
           variant="light"
           color={phase === "idle" ? "green" : phase === "sending" ? "blue" : phase === "retrying" ? "yellow" : "red"}
@@ -291,7 +291,7 @@ export function Workspace({ session, userId, initialContent, onClosed }: Props) 
           {status && status.pending > 0 ? ` · ${t.trace.pending(status.pending)}` : ""}
         </Badge>
         {!closed && (
-          <Group>
+          <Group gap="xs">
             <Button onClick={() => void doRun()} loading={busy === "run"} disabled={!recorder || busy !== null}>
               {t.problem.run}
             </Button>
@@ -303,9 +303,9 @@ export function Workspace({ session, userId, initialContent, onClosed }: Props) 
             </Button>
           </Group>
         )}
-      </Group>
+      </Group></Paper>
       {status?.error && (phase === "failed" || phase === "closed" || phase === "auth") && <ErrorAlert error={status.error} />}
-      <Paper withBorder data-testid="editor">
+      <Paper className="surface-card" data-testid="editor" style={{ overflow: "hidden" }}>
         <Editor
           height="420px"
           language={MONACO_LANGUAGE[session.language] ?? "plaintext"}
@@ -316,9 +316,9 @@ export function Workspace({ session, userId, initialContent, onClosed }: Props) 
         />
       </Paper>
       <ErrorAlert error={error} />
-      {!closed && <Textarea label={t.problem.stdin} value={stdin} onChange={(e) => setStdin(e.currentTarget.value)} autosize minRows={2} />}
+      {!closed && <Paper className="surface-card" p="md"><Textarea label={t.problem.stdin} description="Dữ liệu chỉ dùng cho lần chạy thử, không ảnh hưởng khi nộp bài." value={stdin} onChange={(e) => setStdin(e.currentTarget.value)} autosize minRows={2} styles={{ input: { fontFamily: "monospace" } }} /></Paper>}
       {run && (
-        <Paper withBorder p="sm">
+        <Paper className="surface-card" p="lg">
           <Title order={5} mb="xs">
             {t.problem.runResult}
           </Title>
@@ -326,7 +326,7 @@ export function Workspace({ session, userId, initialContent, onClosed }: Props) 
         </Paper>
       )}
       {submission && (
-        <Paper withBorder p="sm">
+        <Paper className="surface-card" p="lg">
           <Title order={5} mb="xs">
             {t.problem.submitResult}
           </Title>
