@@ -349,15 +349,14 @@ def get_exams_for_student(db: Session, student_id: uuid.UUID, skip: int = 0, lim
     student_class_ids = get_class_ids_for_student(db, student_id)
     if not student_class_ids:
         return [], 0
-    now = datetime.now(timezone.utc)
     exam_ids_q = db.query(ExamAssignment.exam_id).filter(
         ExamAssignment.class_id.in_(student_class_ids)
     ).distinct()
     q = db.query(Exam).filter(
         Exam.id.in_(exam_ids_q),
-        # D11: drafts and cancelled exams are not offered to students
+        # D11: drafts and cancelled exams are not offered to students. Future scheduled
+        # exams are included so students can see their upcoming exam summary.
         Exam.status.notin_([ExamStatus.CANCELLED.value, ExamStatus.DRAFT.value]),
-        Exam.start_time <= now,  # only show started or ongoing
     )
     total = q.count()
     items = q.order_by(Exam.start_time.desc()).offset(skip).limit(limit).all()

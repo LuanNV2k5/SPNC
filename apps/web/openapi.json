@@ -1505,6 +1505,29 @@
         "title": "ExamResponse",
         "type": "object"
       },
+      "ExamSampleCaseResponse": {
+        "properties": {
+          "expected_output": {
+            "title": "Expected Output",
+            "type": "string"
+          },
+          "input_data": {
+            "title": "Input Data",
+            "type": "string"
+          },
+          "order_index": {
+            "title": "Order Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "order_index",
+          "input_data",
+          "expected_output"
+        ],
+        "title": "ExamSampleCaseResponse",
+        "type": "object"
+      },
       "ExamStatisticsResponse": {
         "properties": {
           "average_working_time_seconds": {
@@ -3500,6 +3523,118 @@
           "updated_at"
         ],
         "title": "StudentClassResponse",
+        "type": "object"
+      },
+      "StudentExamProblemListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentExamProblemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StudentExamProblemListResponse",
+        "type": "object"
+      },
+      "StudentExamProblemResponse": {
+        "properties": {
+          "constraints": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Constraints"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Format"
+          },
+          "max_score": {
+            "title": "Max Score",
+            "type": "integer"
+          },
+          "memory_limit_mb": {
+            "title": "Memory Limit Mb",
+            "type": "integer"
+          },
+          "order_index": {
+            "title": "Order Index",
+            "type": "integer"
+          },
+          "output_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Format"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/ExamSampleCaseResponse"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
+          "supported_languages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supported Languages",
+            "type": "array"
+          },
+          "time_limit_ms": {
+            "title": "Time Limit Ms",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "constraints",
+          "input_format",
+          "output_format",
+          "supported_languages",
+          "time_limit_ms",
+          "memory_limit_mb",
+          "order_index",
+          "max_score",
+          "samples"
+        ],
+        "title": "StudentExamProblemResponse",
         "type": "object"
       },
       "StudentStatistics": {
@@ -8613,6 +8748,55 @@
           }
         ],
         "summary": "[P05-E13] Get my participation for an exam (Student)",
+        "tags": [
+          "academic",
+          "exams"
+        ]
+      }
+    },
+    "/api/v1/my/exams/{exam_id}/problems": {
+      "get": {
+        "operationId": "student_exam_problems_api_v1_my_exams__exam_id__problems_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "exam_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exam Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentExamProblemListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "List student-visible problems for an active exam participation",
         "tags": [
           "academic",
           "exams"

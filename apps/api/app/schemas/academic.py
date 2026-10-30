@@ -265,6 +265,31 @@ class ExamListResponse(PaginatedResponse):
     items: List[ExamResponse]
 
 
+class ExamSampleCaseResponse(BaseModel):
+    order_index: int
+    input_data: str
+    expected_output: str
+
+
+class StudentExamProblemResponse(BaseModel):
+    id: uuid.UUID
+    title: str
+    description: str
+    constraints: Optional[str]
+    input_format: Optional[str]
+    output_format: Optional[str]
+    supported_languages: List[str]
+    time_limit_ms: int
+    memory_limit_mb: int
+    order_index: int
+    max_score: int
+    samples: List[ExamSampleCaseResponse]
+
+
+class StudentExamProblemListResponse(BaseModel):
+    items: List[StudentExamProblemResponse]
+
+
 class AttachProblemRequest(BaseModel):
     problem_id: uuid.UUID
     order_index: int

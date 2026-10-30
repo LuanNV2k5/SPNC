@@ -123,6 +123,44 @@ def test_draft_exam_cannot_be_joined_or_listed(world):
     assert r.status_code == 403 and r.json()["error_code"] == "EXAM_ENDED"
 
 
+def test_assigned_student_can_see_upcoming_scheduled_exam(world):
+    w = world
+    cid = _class_with(w, w["student_id"])
+    eid = _draft(w, start=60, end=120, cid=cid, pid=w["pid"])
+    assert client.post(f"/api/v1/exams/{eid}/publish", headers=w["h_t"]).status_code == 200
+    listed = client.get("/api/v1/my/exams", headers=w["h_s"])
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()["items"]] == [eid]
+    assert client.get("/api/v1/my/exams", headers=w["h_s2"]).json()["total"] == 0
+
+
+def test_student_exam_problem_list_requires_active_participation_and_hides_tests(world):
+    w = world
+    cid = _class_with(w, w["student_id"])
+    eid = _draft(w, start=-5, end=60, cid=cid, pid=w["pid"])
+    _set(eid, status="SCHEDULED")
+    path = f"/api/v1/my/exams/{eid}/problems"
+    before = client.get(path, headers=w["h_s"])
+    assert before.status_code == 409 and before.json()["error_code"] == "PARTICIPATION_NOT_STARTED"
+
+    part = client.post(f"/api/v1/my/exams/{eid}/start", headers=w["h_s"])
+    assert part.status_code == 201
+    response = client.get(path, headers=w["h_s"])
+    assert response.status_code == 200
+    body = response.json()["items"]
+    assert [item["id"] for item in body] == [w["pid"]]
+    assert [item["input_data"] for item in body[0]["samples"]] == ["1 2\n"]
+    assert "40 5\n" not in response.text and "100 1\n" not in response.text
+
+    completed = client.post(f"/api/v1/my/exams/{eid}/finalize", headers=w["h_s"])
+    assert completed.status_code == 200 and completed.json()["status"] == "COMPLETED"
+    closed = client.get(path, headers=w["h_s"])
+    assert closed.status_code == 409 and closed.json()["error_code"] == "PARTICIPATION_NOT_ACTIVE"
+
+    other = client.get(path, headers=w["h_s2"])
+    assert other.status_code == 403
+
+
 # ---------------------------------------------------------------------------
 # AC-10-06 — scheduler transitions
 # ---------------------------------------------------------------------------

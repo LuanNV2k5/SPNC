@@ -12,6 +12,8 @@ import { StudentPage } from "./features/teacher/StudentPage";
 import { ProblemEditorPage } from "./features/teacher/ProblemEditorPage";
 import { ProblemsPage } from "./features/teacher/ProblemsPage";
 import { ExamsPage } from "./features/teacher/ExamsPage";
+import { StudentExamsPage } from "./features/studentExam/StudentExamsPage";
+import { StudentExamPage } from "./features/studentExam/StudentExamPage";
 import { AppLayout, RequireAuth, RoleHome } from "./ui/Layout";
 
 const router = createBrowserRouter([
@@ -27,6 +29,9 @@ const router = createBrowserRouter([
           { path: "/practice", element: <ProblemListPage /> },
           { path: "/practice/problems/:problemId", element: <ProblemPage /> },
           { path: "/classes", element: <MyClassesPage /> },
+          { path: "/student/exams", element: <StudentExamsPage /> },
+          { path: "/student/exams/:examId", element: <StudentExamPage /> },
+          { path: "/student/exams/:examId/problems/:problemId", element: <StudentExamPage /> },
           {
             // One teacher WebSocket for all teacher pages of this tab (docs/47 D4)
             path: "/teacher",
