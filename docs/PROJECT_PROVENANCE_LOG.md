@@ -897,3 +897,24 @@ Locked Baseline:
 
 Note:
 Behaviour change to Phase 03 tests from D10: `test_A15` (reuse detected after the grace window) and `test_A16` (concurrent refreshes within the grace all succeed in one family). Deferred follow-ups (docs/47 §3.10, §7.2): `FAST_FIRST_CODE` evaluated only for ACTIVE sessions by the 60 s scheduler cycle (a session ended within a minute never gets it); problem authoring UI; exam screens (20C); admin and statistics (20D). Go-live gate G1 still applies.
+
+---
+
+## Decision: Phase 21A Lock
+
+Date:
+2026-10-31
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-31): "tiếp tục" after the handoff report identified PR #16 as draft and merge/lock/tag as pending decision.
+
+Locked Baseline:
+| Phase | Spec | Merged via | Tag | Verification |
+|---|---|---|---|---|
+| 21A Teacher exam management UI | docs/51 | PR #16 (`6ff8b51`), lock PR (this change) | `phase-21a-teacher-exam-ui-locked` on the merge commit of the lock PR | Frontend typecheck, lint, 43 unit tests, production build; local desktop/mobile functional review at 390×844; Playwright 10/10 in CI Compose; all CI groups green on `main` (run 41095119012). |
+
+Note:
+UI-only phase; no migration or new API endpoint. On mobile the exam/problem controls stack vertically; wide tables remain horizontally scrollable. Student exam taking and admin/statistics remain separate work; the approved roadmap does not order those follow-ups.
