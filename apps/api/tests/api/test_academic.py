@@ -279,6 +279,21 @@ class TestClassManagement:
         assert r2.status_code == 200
         assert r2.json()["total"] == 2
 
+    def test_P20B_member_list_carries_student_names(self, db_session):
+        """docs/47 D2 (AC-20B-03): the owner's roster shows username and full name of each member."""
+        t = _make_user(db_session, "teacher_names", "TEACHER")
+        s = _make_user(db_session, "student_names", "STUDENT")
+        tok = _login("teacher_names")
+        cid = client.post("/api/v1/classes", json={"name": "Names", "academic_year": "2026"}, headers=_auth(tok)).json()["id"]
+        enrolled = client.post(f"/api/v1/classes/{cid}/members", json={"student_id": str(s.id)}, headers=_auth(tok))
+        assert enrolled.json()["username"] == "student_names"
+        items = client.get(f"/api/v1/classes/{cid}/members", headers=_auth(tok)).json()["items"]
+        assert [(i["student_id"], i["username"], i["full_name"]) for i in items] == [(str(s.id), "student_names", "student_names")]
+        # Still owner-only: another teacher gets 403, not the names
+        _make_user(db_session, "teacher_other_names", "TEACHER")
+        r = client.get(f"/api/v1/classes/{cid}/members", headers=_auth(_login("teacher_other_names")))
+        assert r.status_code == 403 and "items" not in r.json()
+
     def test_P05_C08_remove_student(self, db_session):
         """P05-C08: Teacher removes student; membership deactivated; remove again -> 404."""
         t = _make_user(db_session, "teacher_c08", "TEACHER")
