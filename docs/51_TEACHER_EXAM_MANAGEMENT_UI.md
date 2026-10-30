@@ -1,8 +1,9 @@
 # Phase 21A — Teacher exam management UI
 
-> **Status:** IMPLEMENTED — CI, COMPOSE E2E, AND DESKTOP/MOBILE FUNCTIONAL REVIEW PASS
-> **Date:** 2026-10-30
+> **Status:** LOCKED — `phase-21a-teacher-exam-ui-locked`
+> **Date:** 2026-10-31
 > **Baseline:** `phase-20e-ui-polish-locked` (`ae9f7b6`)
+> **Merged:** PR #16 (`6ff8b51`)
 
 ## 1. Scope
 
@@ -49,9 +50,9 @@ Only `DRAFT` exams can be configured. Publishing remains available only for draf
 | `git diff --check` | PASS |
 | Playwright AC-21A-01 | PASS — 10/10 browser tests passed in CI Compose; local isolated Compose regression passed after responsive checks were added. |
 | Desktop/mobile functional review | PASS — reviewed exam detail and list at desktop and 390×844 mobile. Mobile problem, score and add controls stack vertically; navigation and management links work; page has no horizontal overflow. Wide tables retain horizontal scrolling so remaining columns/actions stay reachable. |
-| CI / PR | PASS — all jobs, including Compose Playwright, passed on rerun `41093106190`; PR #16 remains open as a draft. |
-| Merge / lock tag | Pending owner decision after visual review. |
+| CI / PR | PASS — full CI and Compose Playwright passed on `main` (run `41095119012`) after PR #16 merged. |
 
-## 5. Remaining work to close this phase
+## 5. Lock record
 
-1. Review the passing CI and complete the project's PR, merge, lock and tag steps when authorized.
+- Lock PR records the Phase 21A baseline in `docs/PROJECT_PROVENANCE_LOG.md`.
+- Tag `phase-21a-teacher-exam-ui-locked` points to the merge commit of the lock PR.
