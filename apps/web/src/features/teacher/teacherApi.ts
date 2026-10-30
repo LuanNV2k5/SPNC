@@ -9,6 +9,9 @@ export type Signal = Schemas["SignalItem"];
 export type Timeline = Schemas["TimelineResponse"];
 export type Annotation = Schemas["AnnotationResponse"];
 export type SignalStatus = "NEW" | "ACKNOWLEDGED" | "DISMISSED";
+export type Exam = Schemas["ExamResponse"];
+export type ExamAssignment = { id: string; exam_id: string; class_id: string; created_at: string };
+export type ExamProblem = { id: string; exam_id: string; problem_id: string; order_index: number; max_score: number };
 
 /** Every teacher query key starts with "t" so a resync can refetch them all (docs/47 §3.4). */
 export const keys = {
@@ -21,7 +24,26 @@ export const keys = {
   signals: (c: string, s: string) => ["t", "signals", c, s] as const,
   timeline: (sessionId: string) => ["t", "timeline", sessionId] as const,
   annotations: (studentId: string) => ["t", "annotations", studentId] as const,
+  exams: () => ["t", "exams"] as const,
+  exam: (id: string) => ["t", "exam", id] as const,
+  examClasses: (id: string) => ["t", "exam-classes", id] as const,
+  examProblems: (id: string) => ["t", "exam-problems", id] as const,
+  examObservation: (id: string, page = 1) => ["t", "exam-observation", id, page] as const,
 };
+
+export const listExams = () => call(api.GET("/api/v1/exams", { params: { query: { page: 1, size: 100 } } }));
+export const getExam = (exam_id: string) => call(api.GET("/api/v1/exams/{exam_id}", { params: { path: { exam_id } } }));
+export const createExam = (body: Schemas["ExamCreateRequest"]) => call(api.POST("/api/v1/exams", { body }));
+export const updateExam = (exam_id: string, body: Schemas["ExamUpdateRequest"]) => call(api.PATCH("/api/v1/exams/{exam_id}", { params: { path: { exam_id } }, body }));
+export const listExamClasses = async (exam_id: string) => await call(api.GET("/api/v1/exams/{exam_id}/classes", { params: { path: { exam_id } } })) as ExamAssignment[];
+export const assignExamClass = (exam_id: string, class_id: string) => call(api.POST("/api/v1/exams/{exam_id}/classes", { params: { path: { exam_id } }, body: { class_id } }));
+export const unassignExamClass = (exam_id: string, class_id: string) => call(api.DELETE("/api/v1/exams/{exam_id}/classes/{class_id}", { params: { path: { exam_id, class_id } } }));
+export const listExamProblems = async (exam_id: string) => await call(api.GET("/api/v1/exams/{exam_id}/problems", { params: { path: { exam_id } } })) as ExamProblem[];
+export const attachExamProblem = (exam_id: string, problem_id: string, order_index: number, max_score: number) => call(api.POST("/api/v1/exams/{exam_id}/problems", { params: { path: { exam_id } }, body: { problem_id, order_index, max_score } }));
+export const detachExamProblem = (exam_id: string, problem_id: string) => call(api.DELETE("/api/v1/exams/{exam_id}/problems/{problem_id}", { params: { path: { exam_id, problem_id } } }));
+export const publishExam = (exam_id: string) => call(api.POST("/api/v1/exams/{exam_id}/publish", { params: { path: { exam_id } } }));
+export const cancelExam = (exam_id: string, reason: string) => call(api.POST("/api/v1/exams/{exam_id}/cancel", { params: { path: { exam_id } }, body: { reason } }));
+export const getExamObservation = (exam_id: string, page = 1) => call(api.GET("/api/v1/exams/{exam_id}/observation", { params: { path: { exam_id }, query: { page, size: 20 } } }));
 
 const cs = (class_id: string, student_id: string) => ({ class_id, student_id });
 

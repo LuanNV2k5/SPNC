@@ -11,6 +11,7 @@ import { SessionPage } from "./features/teacher/SessionPage";
 import { StudentPage } from "./features/teacher/StudentPage";
 import { ProblemEditorPage } from "./features/teacher/ProblemEditorPage";
 import { ProblemsPage } from "./features/teacher/ProblemsPage";
+import { ExamsPage } from "./features/teacher/ExamsPage";
 import { AppLayout, RequireAuth, RoleHome } from "./ui/Layout";
 
 const router = createBrowserRouter([
@@ -43,6 +44,8 @@ const router = createBrowserRouter([
               { path: "problems", element: <ProblemsPage /> },
               { path: "problems/new", element: <ProblemEditorPage /> },
               { path: "problems/:problemId", element: <ProblemEditorPage /> },
+              { path: "exams", element: <ExamsPage /> },
+              { path: "exams/:examId", element: <ExamsPage /> },
             ],
           },
         ],
