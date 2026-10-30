@@ -820,3 +820,24 @@ Project Owner explicit authorization (2026-10-29): "Approve all" (reply to "Do y
 
 Approved Decisions (summary):
 D1 React + TypeScript + Vite SPA in `apps/web` (supersedes "Next.js" in docs/07/10); D2 TanStack Query + React Router; D3 API client generated from `app.openapi()` with pinned `openapi-typescript` + `openapi-fetch`, generated files committed, CI fails when stale; D4 Mantine; D5 Monaco via `@monaco-editor/react`, bundled locally; D6 same origin (Vite dev proxy, NGINX in production), no CORS, no backend change, no WebSocket `Origin` check in 20A (re-evaluated in 20B); D7 access token in memory, refresh token in `localStorage`, cross-tab single-flight refresh via Web Locks, strict CSP; D8 pure TS trace module, persist-before-send in IndexedDB, batching, backoff, flush barrier before submit/end, single writer per session; D9 client event payload contract (one `EDITOR_CHANGED` per change with the docs/01 fields, no coalescing); D10 resume an ACTIVE practice session only when this browser holds its draft, otherwise end it and start a new one; D11 Vitest + backend contract test + `web` job folded into `ci`, Playwright in `web-e2e` with the compose-e2e cadence plus a recorded local run before lock; D12 Vietnamese UI, one strings file; D13 `apps/web` NGINX image and one new compose service `web`.
+
+---
+
+## Decision: Phase 20A Lock
+
+Date:
+2026-10-30
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-30): "Merge khi xanh" (reply to "Merge PR #10 bằng merge commit?", the option reading "Merge PR #10 bằng merge commit, rồi làm PR lock Phase 20A").
+
+Locked Baseline:
+| Phase | Spec | Merged via | Tag | Verification |
+|---|---|---|---|---|
+| 20A Frontend foundation and student practice | docs/46 | PR #10 (`b1a4f0f`), lock PR (this commit) | `phase-20a-frontend-foundation-locked` on the merge commit of the lock PR | Vitest 28 passed; `test_phase20a_trace_contract.py` 2 passed; local `regression.sh all` on a disposable PostgreSQL: 595 passed, 0 failed (48 files); Playwright 4 passed locally (separate compose project) and in CI (`compose E2E`, run 40996813410 on `main`); GitHub Actions all groups and `web` green on PR #10 |
+
+Note:
+No backend application code or migration changed. Deferred follow-ups (docs/46 §3.10, §7.2): server-side validation of `EDITOR_CHANGED` payloads, a student endpoint returning the latest own snapshot (resume on another device), httpOnly-cookie auth, the WebSocket `Origin` decision (20B), slimming the Monaco bundle. Go-live gate G1 (ROADMAP §3) still applies: test or demo data only. The running demo stack has no `web` service until it is rebuilt.
