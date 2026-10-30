@@ -103,7 +103,7 @@ export function AppLayout() {
 
 export function RoleHome() {
   const { user } = useAuth();
-  if (user?.role === "STUDENT") return <Navigate to="/student/exams" replace />;
+  if (user?.role === "STUDENT") return <Navigate to="/practice" replace />;
   if (user?.role === "TEACHER") return <Navigate to="/teacher/classes" replace />;
   return <Placeholder />;
 }
