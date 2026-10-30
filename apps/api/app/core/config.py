@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
 
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 7 days
+    # docs/47 D10: a token rotated this recently may be presented once more (page reloaded mid-rotation)
+    REFRESH_REUSE_GRACE_SECONDS: int = 10
 
 
 

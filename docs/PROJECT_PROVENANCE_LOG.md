@@ -857,3 +857,22 @@ Project Owner explicit authorization (2026-10-30): "Duyệt tất cả" (reply t
 
 Approved Decisions (summary):
 D1 scope = teacher observation screens plus minimal class management (create class, invite code) and student join-by-code; problem authoring deferred to its own phase; D2 additive backend change: `MemberResponse` gains `username`, `full_name` (no migration); D3 client replay engine (all events, diffs from empty, memoised seek, stop at gaps, verify against every snapshot, rebase on mismatch); D4 teacher WebSocket per tab with query invalidation, token-refresh reconnect, backoff and REST resync, plus 15 s refresh of an open ACTIVE session; D5 no WebSocket `Origin` check (bearer token in first message, no cookies); D6 neutral Vietnamese signal labels, evidence table with timeline links, forbidden-word test; D7 practice page shows statement and editor only after the session starts (`FAST_FIRST_CODE` baseline); D8 annotations on the session page and listed on the student page; D9 Vitest + one backend test + 3 Playwright tests in the existing `compose-e2e` step.
+
+---
+
+## Decision: Phase 20B Amendment D10 (refresh-token reuse grace)
+
+Date:
+2026-10-30
+
+Status:
+APPROVED_SPECIFICATION_AMENDMENT
+
+Approval Source:
+Project Owner explicit choice (2026-10-30) between three options for the logout-on-reload defect found by CI after PR #12: "Backend: cho phép trễ 10 giây (Recommended)".
+
+Context:
+Phase 20B (PR #12, merged as `930e809`) is merged but not locked: the first CI run of the teacher Playwright tests on `main` failed twice (runs 41003368446, 41006123496). The logs show a page reload during `POST /auth/refresh` losing the rotated token, after which reuse detection revoked the family (docs/47 F12).
+
+Approved Decision:
+docs/47 D10 (a): `refresh_sessions.rotated_at` (migration); a token rotated less than `REFRESH_REUSE_GRACE_SECONDS` (default 10) ago whose family still has an active token is accepted once more and yields new tokens in the same family; every other reuse still revokes the family. Logout, logout-all and password change stay final. The Phase 20B lock waits for this fix and a green compose E2E on `main`.

@@ -100,6 +100,25 @@ def create_tokens_for_user(db: Session, user: User, family_id: uuid.UUID = None)
 
 
 
+def _within_reuse_grace(db: Session, db_session: RefreshSession) -> bool:
+    """docs/47 D10: a token rotated moments ago may come back once more when the page reloaded
+    before storing its successor. Only rotation sets rotated_at; logout and family revocation do
+    not, and the family must still hold an active token (so logout stays final)."""
+    if db_session.rotated_at is None:
+        return False
+    now = datetime.now(timezone.utc)
+    if (now - db_session.rotated_at).total_seconds() > settings.REFRESH_REUSE_GRACE_SECONDS:
+        return False
+    active = db.execute(
+        select(RefreshSession.id).where(
+            RefreshSession.family_id == db_session.family_id,
+            RefreshSession.is_revoked.is_(False),
+            RefreshSession.expires_at > now.replace(tzinfo=None),   # naive UTC column (docs/45 §7.2)
+        ).limit(1)
+    ).first()
+    return active is not None
+
+
 def rotate_refresh_token(db: Session, raw_refresh_token: str) -> Tuple[str, str]:
 
     token_hash = get_token_hash(raw_refresh_token)
@@ -136,7 +155,7 @@ def rotate_refresh_token(db: Session, raw_refresh_token: str) -> Tuple[str, str]
 
 
 
-    if db_session.is_revoked:
+    if db_session.is_revoked and not _within_reuse_grace(db, db_session):
 
         # Reuse detected! Revoke the whole family (Requirement 12)
 
@@ -176,9 +195,13 @@ def rotate_refresh_token(db: Session, raw_refresh_token: str) -> Tuple[str, str]
 
 
 
-    # Valid rotation
+    # Valid rotation (or a repeat inside the reuse grace, docs/47 D10: already rotated, keep its time)
 
-    db_session.is_revoked = True
+    if not db_session.is_revoked:
+
+        db_session.is_revoked = True
+
+        db_session.rotated_at = datetime.now(timezone.utc)
 
     db.commit()
 

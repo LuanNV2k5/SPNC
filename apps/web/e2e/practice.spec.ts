@@ -130,3 +130,24 @@ test("AC-20A-04/05: a teacher lands on the teacher home; a student page shows th
   await expect(alert).toHaveAttribute("data-error-code", "FORBIDDEN_ROLE");
   await expect(alert.getByTestId("request-id")).not.toBeEmpty();
 });
+
+test("docs/47 D10: a refresh whose response is lost (page reloaded mid-rotation) does not log the user out", async ({ page }) => {
+  const admin = await adminToken();
+  const student = await createUser(admin, "STUDENT", true);
+  await uiLogin(page, student.username, FINAL_PW);
+  await expect(page.getByTestId("current-user")).toContainText(student.username);
+  // The server rotates the stored token, but the page never stores the successor
+  const status = await page.evaluate(async () => {
+    const r = await fetch("/api/v1/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: localStorage.getItem("spnc.refresh_token") }),
+    });
+    return r.status;
+  });
+  expect(status).toBe(200);
+  await page.reload();
+  await expect(page.getByTestId("current-user")).toContainText(student.username);
+  await page.reload();
+  await expect(page.getByTestId("current-user")).toContainText(student.username);
+});

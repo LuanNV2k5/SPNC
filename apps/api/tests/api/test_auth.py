@@ -177,12 +177,55 @@ def test_A14_refresh_rotates_credential(test_user):
     ref = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt})
     assert ref.json()["refresh_token"] != rt
 
-def test_A15_old_refresh_cannot_normally_be_reused(test_user):
+def _age_rotation(db_session, raw_token: str, seconds: int):
+    """Moves the rotation time of a refresh token into the past (docs/47 D10 grace window)."""
+    from app.services.auth import get_token_hash
+    db_session.execute(text("UPDATE refresh_sessions SET rotated_at = now() - make_interval(secs => :s) WHERE token_hash = :h"),
+                       {"s": seconds, "h": get_token_hash(raw_token)})
+    db_session.commit()
+
+def test_A15_old_refresh_cannot_be_reused_after_the_grace_window(test_user, db_session):
+    # docs/47 D10 changed this test: reuse is detected once the reuse grace has passed
     login = client.post(f"{settings.API_V1_STR}/auth/login", data={"username": "student1", "password": "secure_password_123"})
     rt = login.json()["refresh_token"]
-    client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt})
+    rt_next = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt}).json()["refresh_token"]
+    _age_rotation(db_session, rt, settings.REFRESH_REUSE_GRACE_SECONDS + 1)
     ref2 = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt})
     assert ref2.status_code == 401
+    assert ref2.json()["error_code"] == "REFRESH_REVOKED"
+    # The whole family is revoked, including the successor
+    assert client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt_next}).status_code == 401
+
+def test_A15b_reuse_within_grace_after_reload_keeps_the_session(test_user, db_session):
+    """docs/47 D10 / F12: the page reloaded before storing the rotated token and presents the old one again."""
+    login = client.post(f"{settings.API_V1_STR}/auth/login", data={"username": "student1", "password": "secure_password_123"})
+    rt = login.json()["refresh_token"]
+    lost = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt})
+    assert lost.status_code == 200
+    again = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt})
+    assert again.status_code == 200, again.text
+    new_rt = again.json()["refresh_token"]
+    assert new_rt not in (rt, lost.json()["refresh_token"])
+    assert client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": new_rt}).status_code == 200
+    families = db_session.execute(text("SELECT count(DISTINCT family_id) FROM refresh_sessions")).scalar()
+    assert families == 1
+
+def test_A15c_reuse_within_grace_is_refused_after_logout_or_password_change(test_user):
+    for end in ("logout", "logout-all", "change-password"):
+        login = client.post(f"{settings.API_V1_STR}/auth/login", data={"username": "student1", "password": "secure_password_123"})
+        rt = login.json()["refresh_token"]
+        nxt = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt}).json()
+        h = {"Authorization": f"Bearer {nxt['access_token']}"}
+        if end == "logout":
+            client.post(f"{settings.API_V1_STR}/auth/logout", json={"refresh_token": nxt["refresh_token"]}, headers=h)
+        elif end == "logout-all":
+            client.post(f"{settings.API_V1_STR}/auth/logout-all", headers=h)
+        else:
+            r = client.post(f"{settings.API_V1_STR}/auth/change-password",
+                            json={"current_password": "secure_password_123", "new_password": "secure_password_123"}, headers=h)
+            assert r.status_code == 200
+        ref = client.post(f"{settings.API_V1_STR}/auth/refresh", json={"refresh_token": rt})
+        assert ref.status_code == 401, end
 
 def test_A16_refresh_concurrency_race(test_user):
     login_resp = client.post(f"{settings.API_V1_STR}/auth/login", data={"username": "student1", "password": "secure_password_123"})
@@ -198,10 +241,11 @@ def test_A16_refresh_concurrency_race(test_user):
         results = [f.result() for f in concurrent.futures.as_completed(futures)]
         
     successes = [r for r in results if r.status_code == 200]
-    failures = [r for r in results if r.status_code == 401]
-    
-    assert len(successes) == 1
-    assert len(failures) == 2
+
+    # docs/47 D10 changed this test: concurrent presentations within the reuse grace are serialised
+    # by the row lock and all succeed in the same family; none revokes it
+    assert len(successes) == 3
+    assert len({r.json()["refresh_token"] for r in successes}) == 3
 
 def test_A17_revoked_refresh_rejected(test_user):
     login = client.post(f"{settings.API_V1_STR}/auth/login", data={"username": "student1", "password": "secure_password_123"})
