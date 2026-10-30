@@ -955,3 +955,5 @@ Locked Baseline:
 
 Note:
 Student exam-taking UI with one additive student-scoped problem-content endpoint; no database migration. Hidden tests remain server-only. No visual-polish pass was performed. The main JavaScript bundle remains above the Vite size warning threshold. Admin/statistics UI and other deferred roadmap work remain unordered and require a separate scope decision.
+
+Post-merge correction: main run 41105789029 exposed that the new student home redirect broke the existing practice home journey (AC-20A-02 and AC-20A-07). Follow-up PR #20 (`c8907c1`) restores `/practice` as the student home; the full workflow-dispatch run 41106800105, including Compose E2E, passed.
