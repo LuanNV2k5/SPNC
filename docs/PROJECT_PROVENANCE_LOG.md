@@ -876,3 +876,24 @@ Phase 20B (PR #12, merged as `930e809`) is merged but not locked: the first CI r
 
 Approved Decision:
 docs/47 D10 (a): `refresh_sessions.rotated_at` (migration); a token rotated less than `REFRESH_REUSE_GRACE_SECONDS` (default 10) ago whose family still has an active token is accepted once more and yields new tokens in the same family; every other reuse still revokes the family. Logout, logout-all and password change stay final. The Phase 20B lock waits for this fix and a green compose E2E on `main`.
+
+---
+
+## Decision: Phase 20B Lock
+
+Date:
+2026-10-30
+
+Status:
+LOCKED
+
+Approval Source:
+Project Owner explicit authorization (2026-10-30): "Merge và lock" (for PR #12, the option reading "Merge PR #12 bằng merge commit, rồi làm PR lock Phase 20B và gắn tag khi CI xanh"), then "Merge và lock" again after the D10 fix (for PR #13, "Merge PR #13 bằng merge commit, kiểm tra CI trên main, rồi mở và merge PR lock Phase 20B khi xanh và gắn tag phase-20b-teacher-observation-locked").
+
+Locked Baseline:
+| Phase | Spec | Merged via | Tag | Verification |
+|---|---|---|---|---|
+| 20B Teacher observation UI | docs/47 (D1–D9, amendment D10) | PR #12 (`930e809`), PR #13 (`def50de`, D10 fix), lock PR (this commit) | `phase-20b-teacher-observation-locked` on the merge commit of the lock PR | Vitest 41 passed; local `regression.sh all` 598 passed, 0 failed (48 files); migration `d4f8b2c6e017` up/down/up; Playwright 8/8 locally and in CI (`compose E2E` on `main`, run 41010578779) |
+
+Note:
+Behaviour change to Phase 03 tests from D10: `test_A15` (reuse detected after the grace window) and `test_A16` (concurrent refreshes within the grace all succeed in one family). Deferred follow-ups (docs/47 §3.10, §7.2): `FAST_FIRST_CODE` evaluated only for ACTIVE sessions by the 60 s scheduler cycle (a session ended within a minute never gets it); problem authoring UI; exam screens (20C); admin and statistics (20D). Go-live gate G1 still applies.

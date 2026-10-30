@@ -1,7 +1,7 @@
 # 47 — TEACHER OBSERVATION UI (PHASE 20B) SPECIFICATION
 
 > **Module:** web client (`apps/web`): teacher class view, session timeline and replay, attention signals, annotations, live notifications
-> **Status:** APPROVED 2026-10-30 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md)
+> **Status:** APPROVED 2026-10-30 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md); amendment D10 approved 2026-10-30 — LOCKED 2026-10-30 (`phase-20b-teacher-observation-locked`, on the merge commit of the lock PR)
 > **Date:** 2026-10-30
 > **Parent Baseline:** `phase-20a-frontend-foundation-locked` (`d703d8e`, = `main`)
 > **Proposed Branch:** `phase20b`
@@ -182,4 +182,8 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 | AC-20B-03 `test_P20B_member_list_carries_student_names` | own PostgreSQL 16 on port 55435 | passed (group `academic`: 108 passed) |
 | Full local regression `regression.sh all` | same, every group isolated | **596 passed, 0 failed** (48 files; 595 before this phase + 1) |
 | AC-20B-01..10 Playwright (7 tests: 4 from 20A, 3 new) | separate compose project `spnc20b` (ports 18000/18080/19001; demo stack `phase11` untouched), Chromium | **7 passed**: class created, join with wrong then right code, roster shows the name; FAST_FIRST_CODE appears in the attention list, replay verified against every snapshot with 0 mismatches and ✓ at the submission, signal acknowledged, note added; a student run reaches the open teacher session page over the WebSocket within 8 s |
-| AC-20B-12 CI | GitHub Actions on the PR | _pending_ |
+| AC-20B-12 CI on PR #12 | GitHub-hosted `ubuntu-24.04`, runs 41000243904 (push) and 41000274583 (pull_request) | all groups and `web` green, `ci` green (16 passed, 0 failed); merged as `930e809` |
+| Compose E2E on `main` after PR #12 | runs 41003368446 (+ rerun) and 41006123496 (dispatched) | **failed**: Playwright 6/7, the teacher replay test logged out by a reload during token rotation (F12); led to amendment D10 |
+| D10 fix, PR #13 | PR checks (runs 41008120031, 41008126939) and dispatched compose E2E + backup drill (run 41008125917) | all green; Playwright **8/8**; merged as `def50de` |
+| D10 local | own PostgreSQL 16; compose project `spnc20b` | `regression.sh all` **598 passed, 0 failed**; migration `d4f8b2c6e017` up/down/up, single head; Playwright 8/8 |
+| AC-20B-12 CI on `main` after PR #13 | push run 41010578779 | every job green; backend E2E 5 passed; **Playwright 8 passed** |
