@@ -1,7 +1,7 @@
 # Phase 21A — Teacher exam management UI
 
-> **Status:** IMPLEMENTED — CI AND COMPOSE E2E PASS; VISUAL REVIEW PENDING  
-> **Date:** 2026-10-30  
+> **Status:** IMPLEMENTED — CI AND COMPOSE E2E PASS; VISUAL REVIEW PENDING
+> **Date:** 2026-10-30
 > **Baseline:** `phase-20e-ui-polish-locked` (`ae9f7b6`)
 
 ## 1. Scope
