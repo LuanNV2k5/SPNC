@@ -168,6 +168,12 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 - **ADMIN** still sees the placeholder (20D). The 20A test for the teacher placeholder now checks the teacher home `/teacher/classes`.
 - **Teacher query keys** all start with `"t"`; a WebSocket (re)connect invalidates them all (REST resync), a notification invalidates the attention lists, the student's sessions and signals, and the session's timeline.
 
+### 7.2a Amendment D10 (2026-10-30, after PR #12)
+- **Why:** the first CI runs of the teacher Playwright tests on `main` failed twice (runs 41003368446, 41006123496; a third, dispatched run passed). The API log of a failing run showed `POST /auth/refresh` 200 then 401 within 0.2 s: the test reloaded the page while a rotation was in flight, the rotated token was lost and reuse detection revoked the family (F12). The signal scheduler was healthy (its log, captured on branch `ci-scheduler-logs`, shows a cycle every 60 s).
+- **Fix:** migration `d4f8b2c6e017` (`refresh_sessions.rotated_at`), `services/auth.py` `_within_reuse_grace`, setting `REFRESH_REUSE_GRACE_SECONDS=10`. The CI failure step now also prints the `signal-scheduler` and `reconciler` logs.
+- **Behaviour change to Phase 03 (locked) tests, a direct consequence of D10:** `test_A15` now checks that reuse is detected **after** the grace window (family revoked, successor rejected); `test_A16` (three concurrent refreshes of one token) now expects three successes in the same family instead of one success and two 401s. New: `test_A15b` (reuse within the grace keeps the session, one family), `test_A15c` (reuse within the grace is refused after logout, logout-all and password change).
+- **New Playwright test:** a refresh whose response the page never stores, then two reloads: the user stays logged in.
+
 ### 7.3 Verification
 | Check | Environment | Result |
 |---|---|---|

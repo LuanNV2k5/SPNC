@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import String, Boolean, text, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import String, Boolean, DateTime, text, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
@@ -43,6 +43,8 @@ class RefreshSession(Base, TimestampMixin):
     token_hash: Mapped[str] = mapped_column(String(255), unique=True)
     expires_at: Mapped[datetime] = mapped_column(index=True)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    # docs/47 D10: set only by rotation, so a reload during rotation can be told from a logout
+    rotated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     device_info: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="refresh_sessions")
