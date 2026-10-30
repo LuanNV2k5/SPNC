@@ -227,6 +227,10 @@ jobs:
         if: failure()
         run: docker compose logs --tail 200 api worker signal-scheduler reconciler
 
+      - name: Signal scheduler log (diagnosis)
+        if: always()
+        run: docker compose logs signal-scheduler | tail -60
+
       - name: Tear down
         if: always()
         run: docker compose down -v
