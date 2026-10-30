@@ -34,6 +34,7 @@ from app.schemas.academic import (
     # Exam
     ExamCreateRequest, ExamUpdateRequest, ExamResponse, ExamListResponse,
     AttachProblemRequest, ExamProblemResponse,
+    StudentExamProblemListResponse,
     AssignClassRequest, ExamAssignmentResponse,
     # Participation
     ParticipationResponse,
@@ -617,6 +618,20 @@ def get_my_participation(
     current_user: User = Depends(require_student),
 ):
     return svc.get_my_participation(db, student=current_user, exam_id=exam_id)
+
+
+@router.get(
+    "/my/exams/{exam_id}/problems",
+    response_model=StudentExamProblemListResponse,
+    tags=["exams"],
+    summary="List student-visible problems for an active exam participation",
+)
+def student_exam_problems(
+    exam_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    return {"items": svc.list_student_exam_problems(db, student=current_user, exam_id=exam_id)}
 
 
 # ============================================================

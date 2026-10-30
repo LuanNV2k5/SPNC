@@ -918,3 +918,19 @@ Locked Baseline:
 
 Note:
 UI-only phase; no migration or new API endpoint. On mobile the exam/problem controls stack vertically; wide tables remain horizontally scrollable. Student exam taking and admin/statistics remain separate work; the approved roadmap does not order those follow-ups.
+
+---
+
+## Decision: Phase 21B Student Exam-Taking UI Specification Approval
+
+Date:
+2026-10-31
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-31): “ok tiếp” in response to the Phase 21B D1–D8 draft and implementation plan.
+
+Approved Decisions:
+All decisions D1–D8 in `docs/52_STUDENT_EXAM_TAKING_UI.md` §4 are approved without overrides. Scope is student exam-taking UI with a student-scoped problem-content endpoint exposing public samples only; participation must be in progress before problem access; reuse existing exam sessions and workspace; display the server-derived informational deadline; confirm explicit finalization without auto-submission; obey `result_visible`; preserve backend access errors; verify API/UI behavior across desktop and mobile. No migration or visual-polish pass is approved.

@@ -31,6 +31,7 @@ export function AppLayout() {
   };
   const studentLinks = [
     { to: "/practice", label: t.nav.practice, caption: "Bài tập và tiến độ" },
+    { to: "/student/exams", label: "Kỳ thi", caption: "Lịch thi và bài đang làm" },
     { to: "/classes", label: ts.title, caption: "Các lớp đang tham gia" },
   ];
   const teacherLinks = [
@@ -102,7 +103,7 @@ export function AppLayout() {
 
 export function RoleHome() {
   const { user } = useAuth();
-  if (user?.role === "STUDENT") return <Navigate to="/practice" replace />;
+  if (user?.role === "STUDENT") return <Navigate to="/student/exams" replace />;
   if (user?.role === "TEACHER") return <Navigate to="/teacher/classes" replace />;
   return <Placeholder />;
 }

@@ -1081,6 +1081,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/my/exams/{exam_id}/problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List student-visible problems for an active exam participation */
+        get: operations["student_exam_problems_api_v1_my_exams__exam_id__problems_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/my/exams/{exam_id}/start": {
         parameters: {
             query?: never;
@@ -2067,6 +2084,15 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ExamSampleCaseResponse */
+        ExamSampleCaseResponse: {
+            /** Expected Output */
+            expected_output: string;
+            /** Input Data */
+            input_data: string;
+            /** Order Index */
+            order_index: number;
+        };
         /** ExamStatisticsResponse */
         ExamStatisticsResponse: {
             /** Average Working Time Seconds */
@@ -2861,6 +2887,41 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** StudentExamProblemListResponse */
+        StudentExamProblemListResponse: {
+            /** Items */
+            items: components["schemas"]["StudentExamProblemResponse"][];
+        };
+        /** StudentExamProblemResponse */
+        StudentExamProblemResponse: {
+            /** Constraints */
+            constraints: string | null;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Input Format */
+            input_format: string | null;
+            /** Max Score */
+            max_score: number;
+            /** Memory Limit Mb */
+            memory_limit_mb: number;
+            /** Order Index */
+            order_index: number;
+            /** Output Format */
+            output_format: string | null;
+            /** Samples */
+            samples: components["schemas"]["ExamSampleCaseResponse"][];
+            /** Supported Languages */
+            supported_languages: string[];
+            /** Time Limit Ms */
+            time_limit_ms: number;
+            /** Title */
+            title: string;
         };
         /** StudentStatistics */
         StudentStatistics: {
@@ -5639,6 +5700,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_exam_problems_api_v1_my_exams__exam_id__problems_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exam_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentExamProblemListResponse"];
                 };
             };
             /** @description Validation Error */

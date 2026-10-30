@@ -31,6 +31,14 @@ export const endSession = (session_id: string, lastSequence?: number) =>
     }),
   );
 
+export const endExamSession = (session_id: string, lastSequence?: number) =>
+  call(
+    api.POST("/api/v1/my/exam-sessions/{session_id}/end", {
+      ...path(session_id),
+      body: { termination_source: "STUDENT", last_sequence_number: lastSequence ?? null },
+    }),
+  );
+
 export const createSnapshot = (session_id: string, reason: "RUN" | "SUBMIT" | "CHECKPOINT", language: string, source_code: string) =>
   call(
     api.POST("/api/v1/my/coding-sessions/{session_id}/snapshots", {

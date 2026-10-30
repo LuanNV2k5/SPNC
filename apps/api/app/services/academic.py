@@ -13,9 +13,12 @@ from typing import List, Tuple, Optional
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.models.exam import ExamParticipation, ExamProblem, ParticipationStatus
+from app.models.problem import Problem, ProblemTestCase
 from app.repositories import academic as repo
 from app.services import system_settings
 from app.services.problem_guard import assert_not_deleted, assert_problem_mutable
@@ -440,6 +443,39 @@ def get_my_participation(db: Session, student: User, exam_id: uuid.UUID):
     if not p:
         raise HTTPException(status_code=404, detail=_error("PARTICIPATION_NOT_FOUND", "Participation not found"))
     return p
+
+
+def list_student_exam_problems(db: Session, student: User, exam_id: uuid.UUID):
+    """Return only public statement/sample data after this student's participation starts."""
+    if not repo.student_assigned_to_exam(db, exam_id, student.id):
+        raise HTTPException(status_code=403, detail=_error("EXAM_NOT_ASSIGNED", "Not assigned to this exam"))
+    participation = db.scalar(select(ExamParticipation).where(
+        ExamParticipation.exam_id == exam_id,
+        ExamParticipation.student_id == student.id,
+    ))
+    if not participation:
+        raise HTTPException(status_code=409, detail=_error("PARTICIPATION_NOT_STARTED", "Start the exam before viewing problems"))
+    if participation.status != ParticipationStatus.IN_PROGRESS.value:
+        raise HTTPException(status_code=409, detail=_error("PARTICIPATION_NOT_ACTIVE", "Exam problems are unavailable for this participation"))
+    rows = db.execute(select(ExamProblem, Problem).join(Problem, Problem.id == ExamProblem.problem_id)
+                       .where(ExamProblem.exam_id == exam_id, Problem.deleted_at.is_(None))
+                       .order_by(ExamProblem.order_index)).all()
+    result = []
+    for exam_problem, problem in rows:
+        samples = db.scalars(select(ProblemTestCase).where(
+            ProblemTestCase.problem_id == problem.id,
+            ProblemTestCase.is_hidden.is_(False),
+        ).order_by(ProblemTestCase.order_index)).all()
+        result.append({
+            "id": problem.id, "title": problem.title, "description": problem.description,
+            "constraints": problem.constraints, "input_format": problem.input_format,
+            "output_format": problem.output_format, "supported_languages": problem.supported_languages,
+            "time_limit_ms": problem.time_limit_ms, "memory_limit_mb": problem.memory_limit_mb,
+            "order_index": exam_problem.order_index, "max_score": exam_problem.max_score,
+            "samples": [{"order_index": sample.order_index, "input_data": sample.input_data,
+                         "expected_output": sample.expected_output} for sample in samples],
+        })
+    return result
 
 
 # ============================================================

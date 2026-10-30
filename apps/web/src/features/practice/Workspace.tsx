@@ -263,7 +263,8 @@ export function Workspace({ session, userId, initialContent, onClosed }: Props) 
     setError(null);
     try {
       await flushOrExplain(rec);
-      await P.endSession(session.id, rec.lastSequence);
+      if (session.is_exam_context) await P.endExamSession(session.id, rec.lastSequence);
+      else await P.endSession(session.id, rec.lastSequence);
       setClosed(true);
       await rec.finish();
       onClosed();
