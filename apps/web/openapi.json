@@ -1722,6 +1722,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1735,6 +1746,17 @@
             "format": "uuid",
             "title": "Student Id",
             "type": "string"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
           }
         },
         "required": [

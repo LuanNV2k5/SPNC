@@ -841,3 +841,19 @@ Locked Baseline:
 
 Note:
 No backend application code or migration changed. Deferred follow-ups (docs/46 §3.10, §7.2): server-side validation of `EDITOR_CHANGED` payloads, a student endpoint returning the latest own snapshot (resume on another device), httpOnly-cookie auth, the WebSocket `Origin` decision (20B), slimming the Monaco bundle. Go-live gate G1 (ROADMAP §3) still applies: test or demo data only. The running demo stack has no `web` service until it is rebuilt.
+
+---
+
+## Decision: Phase 20B Teacher Observation UI Specification Approval
+
+Date:
+2026-10-30
+
+Status:
+APPROVED_SPECIFICATION
+
+Approval Source:
+Project Owner explicit authorization (2026-10-30): "Duyệt tất cả" (reply to "Bạn duyệt cả 9 khuyến nghị trong docs/47 §6?"). All recommendations D1–D9 in `docs/47_TEACHER_OBSERVATION_UI.md` §6 are approved without overrides.
+
+Approved Decisions (summary):
+D1 scope = teacher observation screens plus minimal class management (create class, invite code) and student join-by-code; problem authoring deferred to its own phase; D2 additive backend change: `MemberResponse` gains `username`, `full_name` (no migration); D3 client replay engine (all events, diffs from empty, memoised seek, stop at gaps, verify against every snapshot, rebase on mismatch); D4 teacher WebSocket per tab with query invalidation, token-refresh reconnect, backoff and REST resync, plus 15 s refresh of an open ACTIVE session; D5 no WebSocket `Origin` check (bearer token in first message, no cookies); D6 neutral Vietnamese signal labels, evidence table with timeline links, forbidden-word test; D7 practice page shows statement and editor only after the session starts (`FAST_FIRST_CODE` baseline); D8 annotations on the session page and listed on the student page; D9 Vitest + one backend test + 3 Playwright tests in the existing `compose-e2e` step.

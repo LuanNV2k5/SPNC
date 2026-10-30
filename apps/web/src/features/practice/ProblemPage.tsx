@@ -11,8 +11,12 @@ import { Workspace } from "./Workspace";
 
 type View = { kind: "loading" } | { kind: "choose" } | { kind: "active"; session: P.Session; content: string };
 
-function Statement({ problem }: { problem: P.Problem }) {
-  const samples = useQuery({ queryKey: ["samples", problem.id], queryFn: () => P.getSamples(problem.id) });
+/**
+ * The statement is shown only once a session is open (docs/47 D7): `opened_at` is then the moment
+ * the student first sees it, which is the baseline FAST_FIRST_CODE measures from.
+ */
+function Statement({ problem, full }: { problem: P.Problem; full: boolean }) {
+  const samples = useQuery({ queryKey: ["samples", problem.id], queryFn: () => P.getSamples(problem.id), enabled: full });
   const section = (label: string, text?: string | null) =>
     text ? (
       <div>
@@ -31,13 +35,18 @@ function Statement({ problem }: { problem: P.Problem }) {
       <Text size="sm" c="dimmed">
         {t.problem.timeLimit}: {problem.time_limit_ms} ms · {t.problem.memoryLimit}: {problem.memory_limit_mb} MB
       </Text>
-      <TypographyStylesProvider>
-        <Text style={{ whiteSpace: "pre-wrap" }}>{problem.description}</Text>
-      </TypographyStylesProvider>
-      {section(t.problem.input, problem.input_format)}
-      {section(t.problem.output, problem.output_format)}
-      {section(t.problem.constraints, problem.constraints)}
-      {samples.data && samples.data.items.length > 0 && (
+      {!full && <Text c="dimmed">{t.problem.statementAfterStart}</Text>}
+      {full && (
+        <TypographyStylesProvider>
+          <Text style={{ whiteSpace: "pre-wrap" }} data-testid="problem-statement">
+            {problem.description}
+          </Text>
+        </TypographyStylesProvider>
+      )}
+      {full && section(t.problem.input, problem.input_format)}
+      {full && section(t.problem.output, problem.output_format)}
+      {full && section(t.problem.constraints, problem.constraints)}
+      {full && samples.data && samples.data.items.length > 0 && (
         <div>
           <Text fw={600}>{t.problem.samples}</Text>
           {samples.data.items.map((s) => (
@@ -123,7 +132,7 @@ export function ProblemPage() {
     <Grid>
       <Grid.Col span={{ base: 12, md: 5 }}>
         <Paper withBorder p="md">
-          <Statement problem={problem.data} />
+          <Statement problem={problem.data} full={view.kind === "active"} />
         </Paper>
       </Grid.Col>
       <Grid.Col span={{ base: 12, md: 7 }}>

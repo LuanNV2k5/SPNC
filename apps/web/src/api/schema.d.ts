@@ -2126,6 +2126,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Full Name */
+            full_name?: string | null;
             /**
              * Id
              * Format: uuid
@@ -2138,6 +2140,8 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+            /** Username */
+            username?: string | null;
         };
         /** ObservedSessionItem */
         ObservedSessionItem: {

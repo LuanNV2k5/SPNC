@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -73,8 +73,20 @@ class MemberResponse(BaseModel):
     student_id: uuid.UUID
     is_active: bool
     created_at: datetime
+    # docs/47 D2: the owner teacher's roster shows who each member is
+    username: Optional[str] = None
+    full_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _student_names(cls, v):
+        student = getattr(v, "student", None)
+        if student is None:
+            return v
+        return {"id": v.id, "class_id": v.class_id, "student_id": v.student_id, "is_active": v.is_active,
+                "created_at": v.created_at, "username": student.username, "full_name": student.full_name}
 
 
 class MemberListResponse(PaginatedResponse):

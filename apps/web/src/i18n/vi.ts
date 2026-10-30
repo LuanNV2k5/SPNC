@@ -40,6 +40,7 @@ export const t = {
     constraints: "Ràng buộc",
     samples: "Ví dụ",
     start: "Bắt đầu làm bài",
+    statementAfterStart: "Đề bài hiện ra khi bạn bắt đầu làm bài. Thời gian được tính từ lúc đó.",
     chooseLanguage: "Chọn ngôn ngữ",
     otherTab: "Bài này đang được mở ở tab khác. Hãy làm tiếp ở tab đó.",
     stdin: "Dữ liệu vào cho lần chạy",
@@ -115,6 +116,16 @@ const errorTexts: Record<string, string> = {
   STORAGE_UNAVAILABLE: "Kho lưu mã nguồn tạm thời không sẵn sàng, vui lòng thử lại.",
   INTERNAL_ERROR: "Lỗi máy chủ.",
   RESULT_TIMEOUT: "Chưa có kết quả, hãy xem lại sau.",
+  INVITE_CODE_INVALID: "Mã tham gia không đúng.",
+  ALREADY_ENROLLED: "Bạn đã ở trong lớp này.",
+  CLASS_NOT_ACTIVE: "Lớp này không còn hoạt động.",
+  CLASS_NOT_FOUND: "Không tìm thấy lớp.",
+  SIGNAL_NOT_FOUND: "Không tìm thấy tín hiệu.",
+  INVALID_SIGNAL_TRANSITION: "Không đổi được trạng thái tín hiệu.",
+  SNAPSHOT_NOT_FOUND: "Không tìm thấy bản lưu code.",
+  ANNOTATION_NOT_FOUND: "Không tìm thấy ghi chú.",
+  ANNOTATION_FORBIDDEN: "Bạn không sửa được ghi chú này.",
+  ANNOTATION_CONTEXT_MISMATCH: "Ghi chú không khớp với học sinh hoặc phiên đã chọn.",
 };
 
 export function errorText(code: string, serverMessage: string): string {
@@ -123,3 +134,160 @@ export function errorText(code: string, serverMessage: string): string {
 
 export const difficultyLabel: Record<string, string> = { EASY: "Dễ", MEDIUM: "Trung bình", HARD: "Khó" };
 export const languageLabel: Record<string, string> = { CPP17: "C++17", PYTHON3: "Python 3" };
+
+/** Teacher screens (docs/47). Signal texts describe observations only (REQ-SIGNAL-004, D6). */
+export const tt = {
+  nav: { classes: "Lớp của tôi" },
+  classes: {
+    title: "Lớp của tôi",
+    empty: "Bạn chưa có lớp nào.",
+    create: "Tạo lớp",
+    name: "Tên lớp",
+    year: "Năm học",
+    open: "Mở",
+    students: "Học sinh",
+    inviteCode: "Mã tham gia",
+    rotate: "Đổi mã",
+    rotateConfirm: "Mã cũ sẽ không dùng được nữa. Đổi mã?",
+    copy: "Sao chép",
+  },
+  klass: {
+    attention: "Cần chú ý",
+    roster: "Học sinh",
+    noAttention: "Không có tín hiệu mới.",
+    noMembers: "Lớp chưa có học sinh.",
+    newSignals: "Tín hiệu mới",
+    latest: "Gần nhất",
+    username: "Tên đăng nhập",
+    fullName: "Họ tên",
+    joinedAt: "Tham gia",
+    view: "Xem",
+  },
+  student: {
+    sessions: "Các phiên làm bài",
+    signals: "Tín hiệu chú ý",
+    annotations: "Ghi chú của tôi",
+    noSessions: "Chưa có phiên làm bài nào.",
+    noSignals: "Không có tín hiệu.",
+    problem: "Bài",
+    context: "Hình thức",
+    opened: "Mở lúc",
+    ended: "Kết thúc",
+    status: "Trạng thái",
+    verdict: "Kết quả nộp",
+    signalCount: "Tín hiệu",
+    filterStatus: "Trạng thái tín hiệu",
+    filterType: "Loại tín hiệu",
+  },
+  session: {
+    back: "Về trang học sinh",
+    firstCode: "Gõ code đầu tiên",
+    workingTime: "Thời gian làm",
+    finalLoc: "Số dòng cuối",
+    purged: "Dữ liệu dấu vết chi tiết đã được xoá theo chính sách lưu trữ.",
+    loading: (n: number, total: number) => `Đang tải dấu vết ${n}/${total}…`,
+    gap: (seq: number) => `Dấu vết bị thiếu sau sự kiện #${seq}; phần phát lại dừng tại đây.`,
+    position: (seq: number, total: number) => `Sự kiện ${seq}/${total}`,
+    match: "Khớp bản lưu",
+    mismatch: "Khác với bản lưu; phát lại tiếp tục từ bản lưu",
+    snapshot: "Bản lưu",
+    replayed: "Phát lại",
+    events: "Sự kiện",
+    runs: "Các lần chạy thử",
+    live: "Trực tiếp",
+    reconnecting: "Đang kết nối lại…",
+    offline: "Không nhận thông báo trực tiếp",
+    goTo: "Đến thời điểm này",
+    details: "Chi tiết",
+    noEvents: "Không có sự kiện.",
+  },
+  signalStatus: { NEW: "Mới", ACKNOWLEDGED: "Đã ghi nhận", DISMISSED: "Đã bỏ qua" } as Record<string, string>,
+  signalActions: { ack: "Ghi nhận", dismiss: "Bỏ qua", reopen: "Mở lại" },
+  signalType: {
+    IDLE_DETECTED: "Không có thao tác",
+    FAST_FIRST_CODE: "Bắt đầu gõ sớm",
+    REPEATED_FAILURE: "Chạy thử chưa đạt nhiều lần",
+    LOC_ANOMALY: "Số dòng code khác trung vị",
+  } as Record<string, string>,
+  annotations: {
+    title: "Ghi chú",
+    empty: "Chưa có ghi chú.",
+    placeholder: "Ghi chú của bạn (chỉ bạn xem được)",
+    add: "Thêm ghi chú",
+    save: "Lưu",
+    edit: "Sửa",
+    delete: "Xoá",
+    deleteConfirm: "Xoá ghi chú này?",
+    forSignal: "Gắn với tín hiệu",
+  },
+  context: { PRACTICE: "Luyện tập", EXAM: "Thi" } as Record<string, string>,
+  sessionStatus: { ACTIVE: "Đang làm", ENDED: "Đã kết thúc", ABANDONED: "Bỏ dở" } as Record<string, string>,
+  eventType: {
+    PROBLEM_OPENED: "Mở đề",
+    EDITOR_CHANGED: "Sửa code",
+    SNAPSHOT_CREATED: "Lưu bản code",
+    RUN_REQUESTED: "Chạy thử",
+    RUN_COMPLETED: "Có kết quả chạy thử",
+    SESSION_CHECKPOINT: "Lưu định kỳ",
+    SUBMISSION_CREATED: "Nộp bài",
+    SESSION_ENDED: "Kết thúc phiên",
+  } as Record<string, string>,
+};
+
+/** Student class pages (docs/47 §3.5). */
+export const ts = {
+  title: "Lớp của tôi",
+  empty: "Bạn chưa tham gia lớp nào.",
+  join: "Tham gia lớp",
+  code: "Mã tham gia",
+  joined: "Đã tham gia lớp.",
+};
+
+const minutes = (s: unknown) => Math.round(Number(s) / 60);
+const seconds = (s: unknown) => Math.round(Number(s));
+
+/** One-line neutral description of a signal from its canonical evidence (docs/01 §1.8). */
+export function signalSummary(type: string, ev: Record<string, unknown>): string {
+  switch (type) {
+    case "IDLE_DETECTED":
+      return `Không có thao tác trong ${minutes(ev.duration_seconds ?? ev.idle_duration_seconds)} phút (ngưỡng ${minutes(ev.threshold_used ?? ev.threshold_seconds)} phút)`;
+    case "FAST_FIRST_CODE":
+      return `Bắt đầu gõ code ${seconds(ev.delta_seconds ?? ev.elapsed_seconds)} giây sau khi mở đề (ngưỡng ${seconds(ev.threshold_seconds)} giây)`;
+    case "REPEATED_FAILURE":
+      return `Chạy thử chưa đạt ${String(ev.failed_count ?? ev.run_count)} lần liên tiếp, code thay đổi ít giữa các lần`;
+    case "LOC_ANOMALY":
+      return `Số dòng code ${String(ev.observed_loc)} so với trung vị ${String(ev.context_median_loc)} của bài (chênh ${String(ev.delta)})`;
+    default:
+      return type;
+  }
+}
+
+/** Canonical evidence fields shown per signal type, with captions. */
+export const evidenceFields: Record<string, [string, string][]> = {
+  IDLE_DETECTED: [
+    ["start_time", "Thao tác cuối"],
+    ["end_time", "Thời điểm ghi nhận"],
+    ["duration_seconds", "Khoảng lặng (giây)"],
+    ["threshold_used", "Ngưỡng (giây)"],
+  ],
+  FAST_FIRST_CODE: [
+    ["problem_open_time", "Mở đề"],
+    ["first_code_event_time", "Gõ code đầu tiên"],
+    ["delta_seconds", "Chênh lệch (giây)"],
+    ["threshold_seconds", "Ngưỡng (giây)"],
+  ],
+  REPEATED_FAILURE: [
+    ["run_count", "Số lần chạy"],
+    ["failed_count", "Số lần chưa đạt"],
+    ["verdicts", "Kết quả"],
+    ["time_range_start", "Từ"],
+    ["time_range_end", "Đến"],
+  ],
+  LOC_ANOMALY: [
+    ["observed_loc", "Số dòng quan sát"],
+    ["context_median_loc", "Trung vị của bài"],
+    ["delta", "Chênh lệch"],
+    ["threshold_relative", "Ngưỡng tương đối"],
+    ["final_loc", "Số dòng cuối"],
+  ],
+};

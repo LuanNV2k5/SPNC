@@ -120,11 +120,11 @@ test("AC-20A-08: edits made while ingest fails survive a reload with no gap and 
   expect(replay(events.slice(0, runAt))).toBe(await snapshotSource(teacher, classId, student.id, sessionId, runSnapshot));
 });
 
-test("AC-20A-04/05: a teacher gets the placeholder; a student page shows the backend 403 with a request id", async ({ page }) => {
+test("AC-20A-04/05: a teacher lands on the teacher home; a student page shows the backend 403 with a request id", async ({ page }) => {
   const admin = await adminToken();
   const teacher = await createUser(admin, "TEACHER", true);
   await uiLogin(page, teacher.username, FINAL_PW);
-  await expect(page.getByText("Chức năng đang được phát triển")).toBeVisible();
+  await expect(page).toHaveURL(/\/teacher\/classes$/); // docs/47 §3.1 replaced the 20A placeholder
   await page.goto("/practice");
   const alert = page.getByTestId("error-alert");
   await expect(alert).toHaveAttribute("data-error-code", "FORBIDDEN_ROLE");

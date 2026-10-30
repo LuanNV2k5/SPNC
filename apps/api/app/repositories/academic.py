@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy import func, text, and_, or_, exists
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.class_org import Class, ClassMembership
 from app.models.problem import Problem, ProblemClassPublication, ProblemVisibility
@@ -77,7 +77,8 @@ def get_membership(db: Session, class_id: uuid.UUID, student_id: uuid.UUID) -> O
 
 
 def get_memberships_by_class(db: Session, class_id: uuid.UUID, skip: int = 0, limit: int = 50) -> Tuple[List[ClassMembership], int]:
-    q = db.query(ClassMembership).filter(ClassMembership.class_id == class_id, ClassMembership.is_active == True)
+    q = db.query(ClassMembership).options(joinedload(ClassMembership.student)).filter(
+        ClassMembership.class_id == class_id, ClassMembership.is_active == True)
     total = q.count()
     items = q.order_by(ClassMembership.created_at.asc()).offset(skip).limit(limit).all()
     return items, total
