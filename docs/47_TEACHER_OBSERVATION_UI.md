@@ -1,7 +1,7 @@
 # 47 — TEACHER OBSERVATION UI (PHASE 20B) SPECIFICATION
 
 > **Module:** web client (`apps/web`): teacher class view, session timeline and replay, attention signals, annotations, live notifications
-> **Status:** DRAFT — awaiting Project Owner approval of §6
+> **Status:** APPROVED 2026-10-30 (all §6 recommendations; see PROJECT_PROVENANCE_LOG.md)
 > **Date:** 2026-10-30
 > **Parent Baseline:** `phase-20a-frontend-foundation-locked` (`d703d8e`, = `main`)
 > **Proposed Branch:** `phase20b`
@@ -147,7 +147,7 @@ Approval is recorded in `docs/PROJECT_PROVENANCE_LOG.md` before any code is writ
 ### 7.1 Changes
 | Commit | Content |
 |---|---|
-| | |
+| `9dacacc` | This specification (draft) |
 
 ### 7.2 Implementation Notes (within the approved decisions)
 _None yet._
