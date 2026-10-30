@@ -1,6 +1,6 @@
 # Phase 21A — Teacher exam management UI
 
-> **Status:** IMPLEMENTED — CI AND COMPOSE E2E PASS; VISUAL REVIEW PENDING
+> **Status:** IMPLEMENTED — CI, COMPOSE E2E, AND DESKTOP/MOBILE FUNCTIONAL REVIEW PASS
 > **Date:** 2026-10-30
 > **Baseline:** `phase-20e-ui-polish-locked` (`ae9f7b6`)
 
@@ -47,12 +47,11 @@ Only `DRAFT` exams can be configured. Publishing remains available only for draf
 | `npm test -- --run` | PASS — 43 tests in 9 files |
 | `npm run build` | PASS; existing Monaco bundle-size warning remains |
 | `git diff --check` | PASS |
-| Playwright AC-21A-01 | PASS on rerun; 10/10 browser tests passed in Compose. The first run exposed an ambiguous locator, which was corrected before the passing run. |
-| Desktop/mobile visual review | Pending; local Docker Desktop is unavailable. E2E runs Chromium at the configured desktop viewport. |
+| Playwright AC-21A-01 | PASS — 10/10 browser tests passed in CI Compose; local isolated Compose regression passed after responsive checks were added. |
+| Desktop/mobile functional review | PASS — reviewed exam detail and list at desktop and 390×844 mobile. Mobile problem, score and add controls stack vertically; navigation and management links work; page has no horizontal overflow. Wide tables retain horizontal scrolling so remaining columns/actions stay reachable. |
 | CI / PR | PASS; PR #16 is open as a draft. |
 | Merge / lock tag | Pending owner decision after visual review. |
 
 ## 5. Remaining work to close this phase
 
-1. Review the exam list and detail screens on desktop and mobile with a running app; this is functional QA, not a visual polish pass.
-2. Review the passing CI and complete the project's PR, merge, lock and tag steps when authorized.
+1. Review the passing CI and complete the project's PR, merge, lock and tag steps when authorized.
