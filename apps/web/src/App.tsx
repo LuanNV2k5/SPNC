@@ -1,8 +1,14 @@
-import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, RouterProvider } from "react-router";
 import { ChangePasswordPage } from "./features/auth/ChangePasswordPage";
 import { LoginPage } from "./features/auth/LoginPage";
+import { MyClassesPage } from "./features/practice/MyClassesPage";
 import { ProblemListPage } from "./features/practice/ProblemListPage";
 import { ProblemPage } from "./features/practice/ProblemPage";
+import { ClassesPage } from "./features/teacher/ClassesPage";
+import { ClassPage } from "./features/teacher/ClassPage";
+import { LiveProvider } from "./features/teacher/LiveProvider";
+import { SessionPage } from "./features/teacher/SessionPage";
+import { StudentPage } from "./features/teacher/StudentPage";
 import { AppLayout, RequireAuth, RoleHome } from "./ui/Layout";
 
 const router = createBrowserRouter([
@@ -17,6 +23,23 @@ const router = createBrowserRouter([
           { path: "/", element: <RoleHome /> },
           { path: "/practice", element: <ProblemListPage /> },
           { path: "/practice/problems/:problemId", element: <ProblemPage /> },
+          { path: "/classes", element: <MyClassesPage /> },
+          {
+            // One teacher WebSocket for all teacher pages of this tab (docs/47 D4)
+            path: "/teacher",
+            element: (
+              <LiveProvider>
+                <Outlet />
+              </LiveProvider>
+            ),
+            children: [
+              { index: true, element: <Navigate to="/teacher/classes" replace /> },
+              { path: "classes", element: <ClassesPage /> },
+              { path: "classes/:classId", element: <ClassPage /> },
+              { path: "classes/:classId/students/:studentId", element: <StudentPage /> },
+              { path: "classes/:classId/students/:studentId/sessions/:sessionId", element: <SessionPage /> },
+            ],
+          },
         ],
       },
     ],

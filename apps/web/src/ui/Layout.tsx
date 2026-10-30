@@ -1,7 +1,7 @@
 import { AppShell, Button, Center, Group, Loader, Text, Title } from "@mantine/core";
 import { Link, Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../features/auth/AuthContext";
-import { t } from "../i18n/vi";
+import { t, ts, tt } from "../i18n/vi";
 
 /** Route guard: UX only, authorization stays on the backend (docs/46 §3.4). */
 export function RequireAuth() {
@@ -33,8 +33,18 @@ export function AppLayout() {
           <Group>
             <Title order={4}>SPNC</Title>
             {user?.role === "STUDENT" && (
-              <Button component={Link} to="/practice" variant="subtle">
-                {t.nav.practice}
+              <>
+                <Button component={Link} to="/practice" variant="subtle">
+                  {t.nav.practice}
+                </Button>
+                <Button component={Link} to="/classes" variant="subtle">
+                  {ts.title}
+                </Button>
+              </>
+            )}
+            {user?.role === "TEACHER" && (
+              <Button component={Link} to="/teacher/classes" variant="subtle">
+                {tt.nav.classes}
               </Button>
             )}
           </Group>
@@ -57,7 +67,9 @@ export function AppLayout() {
 
 export function RoleHome() {
   const { user } = useAuth();
-  return user?.role === "STUDENT" ? <Navigate to="/practice" replace /> : <Placeholder />;
+  if (user?.role === "STUDENT") return <Navigate to="/practice" replace />;
+  if (user?.role === "TEACHER") return <Navigate to="/teacher/classes" replace />;
+  return <Placeholder />;
 }
 
 export function Placeholder() {
