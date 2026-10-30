@@ -58,11 +58,12 @@ export async function createUser(admin: string, role: "STUDENT" | "TEACHER", rea
 }
 
 /** A PUBLIC Python problem with one sample and one hidden case; the student joins the teacher's class. */
-export async function setupProblem(teacher: Person, student: Person): Promise<{ problemId: string; classId: string }> {
+export async function setupProblem(teacher: Person, student: Person): Promise<{ problemId: string; classId: string; problemTitle: string }> {
   const api = await ctx();
   const h = bearer(teacher.token);
+  const problemTitle = `PW Sum ${randomUUID().slice(0, 4)}`;
   const p = await api.post(`${API}/problems`, {
-    data: { title: `PW Sum ${randomUUID().slice(0, 4)}`, description: "Tính a + b", visibility: "PUBLIC", supported_languages: ["PYTHON3"] },
+    data: { title: problemTitle, description: "Tính a + b", visibility: "PUBLIC", supported_languages: ["PYTHON3"] },
     headers: h,
   });
   expect(p.status(), await p.text()).toBeLessThan(300);
@@ -78,7 +79,7 @@ export async function setupProblem(teacher: Person, student: Person): Promise<{ 
   const cls = await c.json();
   const j = await api.post(`${API}/my/classes/join`, { data: { invite_code: cls.invite_code }, headers: bearer(student.token) });
   expect(j.status(), await j.text()).toBe(201);
-  return { problemId, classId: cls.id as string };
+  return { problemId, classId: cls.id as string, problemTitle };
 }
 
 export async function latestSessionId(student: Person, problemId: string): Promise<string> {

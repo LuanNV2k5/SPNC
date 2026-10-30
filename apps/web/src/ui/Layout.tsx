@@ -36,6 +36,7 @@ export function AppLayout() {
   const teacherLinks = [
     { to: "/teacher/classes", label: tt.nav.classes, caption: "Lớp học và học sinh" },
     { to: "/teacher/problems", label: tt.nav.problems, caption: "Kho đề và phát hành" },
+    { to: "/teacher/exams", label: "Kỳ thi", caption: "Lịch thi và tình trạng làm bài" },
   ];
   const links = user?.role === "TEACHER" ? teacherLinks : studentLinks;
   const initials = user?.full_name.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join("").toUpperCase() || "U";
